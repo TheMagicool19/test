@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { FeynmanChallengeResponse } from '../types/navicella';
 import { runFeynmanChallenge } from '../services/api';
+import { PageShell, PageHeader, Segmented } from './ui/Page';
 
 interface MoleculePreset {
   name: string;
@@ -247,55 +248,28 @@ export const LewisModule: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-violet-950 border border-violet-800 text-violet-400">
-              C-03: L.E.W.I.S. (REATTORE ACCADEMICO CTF)
-            </span>
-            <span className="text-xs font-mono text-slate-400">
-              RDKIT CHEMINFORMATICS &bull; METODO FEYNMAN &bull; STECHIOMETRIA
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold font-mono text-white mt-1">
-            L.E.W.I.S. CTF STUDY & CHEMINFORMATICS
-          </h1>
-          <p className="text-xs text-slate-400 font-sans mt-0.5 max-w-3xl">
-            Modulo dedicato agli studi accademici in Chimica e Tossicologia Forense. 
-            Include il visualizzatore molecolare SMILES, il calcolo stechiometrico in sandbox e l'Esaminatore Implacabile Feynman.
-          </p>
-        </div>
-
-        {/* Tab buttons */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-slate-800 text-xs font-mono">
-          <button
-            onClick={() => setActiveTab('visualizer')}
-            className={`px-3.5 py-2 rounded-lg font-bold transition-all ${
-              activeTab === 'visualizer' ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/80'
-            }`}
-          >
-            Visualizzatore 3D
-          </button>
-          <button
-            onClick={() => setActiveTab('stoichiometry')}
-            className={`px-3.5 py-2 rounded-lg font-bold transition-all ${
-              activeTab === 'stoichiometry' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/80'
-            }`}
-          >
-            Calcolatore Stechiometria
-          </button>
-          <button
-            onClick={() => setActiveTab('feynman')}
-            className={`px-3.5 py-2 rounded-lg font-bold transition-all ${
-              activeTab === 'feynman' ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/80'
-            }`}
-          >
-            Esaminatore Implacabile
-          </button>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        code="C-03 · L.E.W.I.S."
+        title="Chimica CTF & metodo Feynman"
+        description={
+          <>
+            Modulo per gli studi di Chimica e Tossicologia Forense: visualizzatore molecolare SMILES,
+            calcolo stechiometrico in sandbox ed esaminatore Feynman.
+          </>
+        }
+        aside={
+          <Segmented
+            value={activeTab}
+            onChange={(id) => setActiveTab(id as 'visualizer' | 'stoichiometry' | 'feynman')}
+            options={[
+              { id: 'visualizer', label: 'Molecola 3D' },
+              { id: 'stoichiometry', label: 'Stechiometria' },
+              { id: 'feynman', label: 'Esaminatore' },
+            ]}
+          />
+        }
+      />
 
       {/* Tab: 3D Molecule Visualizer */}
       {activeTab === 'visualizer' && (
@@ -642,6 +616,6 @@ export const LewisModule: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 };

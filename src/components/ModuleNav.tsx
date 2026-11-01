@@ -100,7 +100,7 @@ export const ModuleNav: React.FC<ModuleNavProps> = ({
   return (
     <nav
       aria-label="Compartimenti di sistema"
-      className="relative border-b border-hairline bg-void/50 backdrop-blur-xl"
+      className="relative border-b border-hairline bg-panel"
     >
       <div className="mx-auto max-w-7xl px-2 sm:px-4">
         <div className="no-scrollbar flex items-stretch gap-0.5 overflow-x-auto">

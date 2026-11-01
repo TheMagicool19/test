@@ -1,18 +1,23 @@
 import React, { useState } from 'react';
-import { 
-  Flame, 
-  Cpu, 
-  Server, 
-  Activity, 
-  Terminal, 
-  Play, 
-  ShieldCheck, 
-  CheckCircle2, 
-  RefreshCw, 
-  Radio, 
-  Layers 
+import {
+  Flame,
+  Cpu,
+  Terminal,
+  Play,
+  RefreshCw,
+  Radio,
 } from 'lucide-react';
 import { SystemTelemetry } from '../types/navicella';
+import {
+  PageShell,
+  PageHeader,
+  Panel,
+  PanelHeader,
+  StatTile,
+  StatusDot,
+  Field,
+  inputClass,
+} from './ui/Page';
 
 interface ForgeModuleProps {
   telemetry: SystemTelemetry | null;
@@ -21,13 +26,15 @@ interface ForgeModuleProps {
 export const ForgeModule: React.FC<ForgeModuleProps> = ({ telemetry }) => {
   const [activeModel, setActiveModel] = useState('DeepSeek-R1-Distill-Qwen-14B-AWQ (Ollama)');
   const [targetReceptor, setTargetReceptor] = useState('5-HT2A Serotonin Receptor (PDB: 6A93)');
-  const [ligandSmiles, setLigandSmiles] = useState('CCN(CC)C(=O)C1CN(C2CC3=CNC4=CC=CC(=C34)C2=C1)C');
+  const [ligandSmiles, setLigandSmiles] = useState(
+    'CCN(CC)C(=O)C1CN(C2CC3=CNC4=CC=CC(=C34)C2=C1)C'
+  );
   const [isRunningSim, setIsRunningSim] = useState(false);
   const [dockingLogs, setDockingLogs] = useState<string[]>([
-    '[COLAB-TUNNEL] Connessione SSH stabilita con successo su ngrok-colab-tunnel-secure.ngrok-free.app',
+    '[COLAB-TUNNEL] Connessione SSH stabilita su ngrok-colab-tunnel-secure.ngrok-free.app',
     '[GPU-A100] CUDA Driver 12.4 attivo, VRAM allocata: 13.8 GB / 40.0 GB',
     '[VLLM-DAEMON] Server vLLM in ascolto sulla porta interna 8000 (Ollama Container)',
-    '[RED-TEAM] Modalità privacy IP chimico attiva: nessuna query inviata a server proprietari esterni',
+    '[RED-TEAM] Modalità privacy IP chimico attiva: nessuna query verso server proprietari',
   ]);
   const [dockingResult, setDockingResult] = useState<{
     affinity: number;
@@ -50,7 +57,7 @@ export const ForgeModule: React.FC<ForgeModuleProps> = ({ telemetry }) => {
       `[RDKit] Generazione conformeri 3D da stringa SMILES: ${ligandSmiles.slice(0, 30)}...`,
       `[AUTODOCK VINA] Grid box centrata sul sito ortosterico (X: 14.2, Y: -8.5, Z: 24.1)...`,
       `[CUDA-STREAM] Calcolo tensoriale binding energy sui core Tensor A100...`,
-      `[DEEPSEEK-R1] Audit Red-Team completato: stabilità conformazionale verificata con Delta G < -9.5 kcal/mol`,
+      `[DEEPSEEK-R1] Audit Red-Team completato: stabilità conformazionale verificata (ΔG < -9.5 kcal/mol)`,
     ];
 
     steps.forEach((msg, idx) => {
@@ -80,190 +87,163 @@ export const ForgeModule: React.FC<ForgeModuleProps> = ({ telemetry }) => {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-orange-950 border border-orange-800 text-orange-400">
-              C-04: F.O.R.G.E. (REATTORE R&D COMPUTAZIONALE)
-            </span>
-            <span className="text-xs font-mono text-slate-400">
-              GOOGLE COLAB GPU &bull; OLLAMA / VLLM &bull; DEEPSEEK-R1 RED TEAM
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold font-mono text-white mt-1">
-            F.O.R.G.E. HIGH-PERFORMANCE R&D CLUSTER
-          </h1>
-          <p className="text-xs text-slate-400 font-sans mt-0.5 max-w-3xl">
-            Ambiente di computazione avanzata. Connette un Google Colab con tunnel sicuro (ngrok/Cloudflare) 
-            per eseguire docking molecolare su GPU NVIDIA A100 e hosting locale di modelli Open-Weights (DeepSeek-R1) 
-            per garantire la tutela della proprietà intellettuale (IP chimico).
-          </p>
-        </div>
+    <PageShell>
+      <PageHeader
+        code="C-04 · F.O.R.G.E."
+        title="Cluster R&D ad alte prestazioni"
+        description={
+          <>
+            Ambiente di computazione avanzata su Google Colab con tunnel sicuro. Docking molecolare
+            su GPU NVIDIA A100 e hosting locale di modelli open-weights (DeepSeek-R1) per la tutela
+            della proprietà intellettuale chimica.
+          </>
+        }
+        aside={<StatusDot label={`${gpu.device} · ${gpu.status}`} />}
+      />
 
-        <div className="flex items-center gap-2 text-xs font-mono text-orange-300 bg-orange-950/60 px-3 py-1.5 rounded-lg border border-orange-800">
-          <Cpu className="w-4 h-4 text-orange-400" />
-          <span>GPU: {gpu.device} &bull; {gpu.status}</span>
-        </div>
+      {/* ---- Telemetria hardware ---- */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatTile
+          label="Tunnel remoto SSH"
+          value={<span className="truncate text-[12px]">{gpu.tunnel}</span>}
+          hint="Latenza media 38 ms · Colab Pro"
+        />
+        <StatTile label="Hardware" value={<span className="text-[13px]">{gpu.device}</span>} hint={`Utilizzo core ${gpu.utilization}`} />
+        <StatTile label="VRAM allocata" value={gpu.vramUsed} hint="vLLM KV cache · 92% headroom" tone="warning" />
+        <StatTile label="Container locale" value="DeepSeek-R1" hint={`vLLM porta ${gpu.vllmPort} · IP isolato`} tone="success" />
       </div>
 
-      {/* Telemetry Dashboard Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/40 font-mono text-xs space-y-1">
-          <div className="text-slate-400 text-[10px] uppercase">TUNNEL REMOTO SSH</div>
-          <div className="text-sm font-bold text-slate-100 truncate flex items-center gap-1.5">
-            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            {gpu.tunnel}
-          </div>
-          <div className="text-[10px] text-emerald-400">Latenza media: 38ms (Colab PRO)</div>
-        </div>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        {/* ---- Controlli ---- */}
+        <Panel className="lg:col-span-5">
+          <PanelHeader
+            icon={Flame}
+            label="Red team"
+            title="Simulazione docking & audit"
+            aside={
+              <span className="flex items-center gap-1.5 font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-emerald-300/90">
+                <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                IP shield
+              </span>
+            }
+          />
 
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/40 font-mono text-xs space-y-1">
-          <div className="text-slate-400 text-[10px] uppercase">HARDWARE ACCELERATION</div>
-          <div className="text-sm font-bold text-cyan-300">{gpu.device}</div>
-          <div className="text-[10px] text-slate-400">Utilizzo Core: {gpu.utilization}</div>
-        </div>
-
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/40 font-mono text-xs space-y-1">
-          <div className="text-slate-400 text-[10px] uppercase">MEMORIA VRAM ALLOCATA</div>
-          <div className="text-sm font-bold text-amber-400">{gpu.vramUsed}</div>
-          <div className="text-[10px] text-slate-400">vLLM KV Cache: 92% headroom</div>
-        </div>
-
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/40 font-mono text-xs space-y-1">
-          <div className="text-slate-400 text-[10px] uppercase">CONTAINER LOCAL MODEL</div>
-          <div className="text-sm font-bold text-emerald-400 truncate">DeepSeek-R1 (Local)</div>
-          <div className="text-[10px] text-slate-400">Porta vLLM: {gpu.vllmPort} &bull; IP Isolato</div>
-        </div>
-      </div>
-
-      {/* Simulation Runner & Docking Controls */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Controls Column */}
-        <div className="lg:col-span-5 rounded-xl border border-slate-800 bg-slate-900/40 p-5 space-y-4">
-          <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
-            <h3 className="font-bold font-mono text-slate-100 text-sm flex items-center gap-2">
-              <Flame className="w-4 h-4 text-orange-400" /> SIMULAZIONE DOCKING & AUDIT RED-TEAM
-            </h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-              IP-SHIELD ACTIVE
-            </span>
-          </div>
-
-          <div className="space-y-3 font-mono text-xs">
-            <div>
-              <label className="block text-slate-300 font-bold mb-1">
-                Motore Computazionale / Modello:
-              </label>
+          <div className="mt-4 space-y-3.5">
+            <Field label="Motore / modello">
               <select
                 value={activeModel}
                 onChange={(e) => setActiveModel(e.target.value)}
-                className="w-full p-2.5 rounded bg-slate-950 border border-slate-700 text-orange-300 focus:outline-none focus:border-orange-500"
+                className={inputClass}
               >
                 <option value="DeepSeek-R1-Distill-Qwen-14B-AWQ (Ollama)">
-                  DeepSeek-R1-Distill-Qwen-14B (Locale / Ollama)
+                  DeepSeek-R1-Distill-Qwen-14B (locale / Ollama)
                 </option>
                 <option value="Autodock Vina GPU + RDKit (Colab A100)">
                   Autodock Vina GPU + RDKit (Colab A100)
                 </option>
-                <option value="IBM RXN Retro-synthesis API">
-                  IBM RXN Retro-synthesis API
-                </option>
+                <option value="IBM RXN Retro-synthesis API">IBM RXN Retro-synthesis API</option>
               </select>
-            </div>
+            </Field>
 
-            <div>
-              <label className="block text-slate-300 font-bold mb-1">
-                Target Recettoriale (PDB ID):
-              </label>
+            <Field label="Target recettoriale" hint="PDB ID">
               <input
                 type="text"
                 value={targetReceptor}
                 onChange={(e) => setTargetReceptor(e.target.value)}
-                className="w-full p-2.5 rounded bg-slate-950 border border-slate-700 text-slate-200 focus:outline-none focus:border-orange-500"
+                className={inputClass}
               />
-            </div>
+            </Field>
 
-            <div>
-              <label className="block text-slate-300 font-bold mb-1">
-                Ligando da Testare (Formula SMILES):
-              </label>
+            <Field label="Ligando" hint="SMILES">
               <textarea
                 rows={3}
                 value={ligandSmiles}
                 onChange={(e) => setLigandSmiles(e.target.value)}
-                className="w-full p-2.5 rounded bg-slate-950 border border-slate-700 text-slate-200 focus:outline-none focus:border-orange-500 text-[11px]"
+                className={`${inputClass} resize-none font-mono text-[11px] leading-relaxed`}
               />
-            </div>
+            </Field>
 
             <button
               onClick={handleRunDocking}
               disabled={isRunningSim}
-              className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-mono text-xs font-bold transition-all shadow-lg shadow-orange-600/30 disabled:opacity-50 flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
+              className="btn-primary w-full py-2.5"
             >
               {isRunningSim ? (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  Esecuzione su Cluster Colab...
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  Esecuzione su cluster…
                 </>
               ) : (
                 <>
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  Lancia Simulazione Docking su GPU A100
+                  <Play className="h-3 w-3 fill-current" />
+                  Lancia simulazione su GPU A100
                 </>
               )}
             </button>
           </div>
 
-          {/* Results Badge */}
           {dockingResult && (
-            <div className="p-3.5 rounded-lg border border-emerald-800/60 bg-emerald-950/30 text-xs font-mono space-y-2">
-              <div className="font-bold text-emerald-400 flex items-center justify-between">
-                <span>CONVERGENZA ENERGETICA (ΔG):</span>
-                <span className="text-sm font-extrabold text-white">
-                  {dockingResult.affinity} kcal/mol
+            <div className="animate-fade-in mt-4 rounded-lg border border-hairline bg-white/[0.02] p-3.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="label-micro">ΔG convergenza</span>
+                <span className="font-mono text-[15px] font-semibold text-emerald-400">
+                  {dockingResult.affinity}
+                  <span className="ml-1 text-[10px] font-normal text-ink-dim">kcal/mol</span>
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
-                <div>RMSD: {dockingResult.rmsd} Å</div>
-                <div>Legami Idrogeno: {dockingResult.hbonds}</div>
+              <div className="mt-2.5 grid grid-cols-2 gap-2 border-t border-white/[0.05] pt-2.5 font-mono text-[10px] uppercase tracking-[0.06em] text-ink-dim">
+                <span>RMSD · {dockingResult.rmsd} Å</span>
+                <span className="text-right">H-bond · {dockingResult.hbonds}</span>
               </div>
             </div>
           )}
-        </div>
+        </Panel>
 
-        {/* Live Terminal / Execution Log */}
-        <div className="lg:col-span-7 rounded-xl border border-slate-800 bg-slate-950/90 p-5 flex flex-col justify-between font-mono text-xs space-y-4">
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 text-slate-300">
-                <Terminal className="w-4 h-4 text-orange-400" />
-                <span className="font-bold">PYTHON SANDBOX & COLAB STREAM CONSOLE</span>
-              </div>
-              <span className="text-[10px] text-slate-500">TTY: /dev/pts/1</span>
-            </div>
+        {/* ---- Console ---- */}
+        <Panel className="lg:col-span-7 flex flex-col">
+          <PanelHeader
+            icon={Terminal}
+            label="Python sandbox"
+            title="Stream console Colab"
+            aside={
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-dim">
+                TTY · /dev/pts/1
+              </span>
+            }
+          />
 
-            <div className="mt-3 bg-slate-900/80 rounded-lg p-3.5 border border-slate-800/90 space-y-1.5 max-h-[380px] overflow-y-auto">
+          <div className="mt-4 flex-1 overflow-y-auto rounded-lg border border-hairline bg-void/70 p-3.5">
+            <div className="space-y-1.5">
               {dockingLogs.map((log, idx) => (
-                <div key={idx} className="text-[11px] leading-relaxed text-slate-300">
-                  <span className="text-orange-400 font-bold">&gt;</span> {log}
+                <div
+                  key={idx}
+                  className="flex gap-2 font-mono text-[11px] leading-relaxed text-ink-soft"
+                >
+                  <span className="shrink-0 text-accent-soft/70">&gt;</span>
+                  <span className="min-w-0 break-words">{log}</span>
                 </div>
               ))}
               {isRunningSim && (
-                <div className="text-cyan-400 animate-pulse text-[11px]">
-                  &gt; Elaborazione tensoriale su NVIDIA A100 in corso...
+                <div className="flex items-center gap-2 font-mono text-[11px] text-accent-soft">
+                  <span>&gt;</span>
+                  <span className="animate-pulse">Elaborazione tensoriale su A100…</span>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
-            <span>Container vLLM &bull; Red Team IP Shield</span>
-            <span>Ambiente di Ricerca Avanzato F.O.R.G.E.</span>
+          <div className="mt-3 flex items-center justify-between border-t border-hairline pt-3 font-mono text-[10px] uppercase tracking-[0.08em] text-ink-dim">
+            <span className="flex items-center gap-1.5">
+              <Radio className="h-3 w-3 text-emerald-400" />
+              Container vLLM · red team
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Cpu className="h-3 w-3" />
+              Ambiente ricerca
+            </span>
           </div>
-        </div>
+        </Panel>
       </div>
-    </div>
+    </PageShell>
   );
 };

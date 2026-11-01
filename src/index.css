@@ -321,6 +321,41 @@
     height: 1px;
     background: linear-gradient(90deg, transparent, var(--color-hairline-strong), transparent);
   }
+
+  /* Range slider coerente con il design system */
+  .range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+    cursor: pointer;
+  }
+  .range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #f2f4f8;
+    border: 3px solid var(--color-accent);
+    box-shadow: 0 0 0 4px rgba(126, 107, 242, 0.16);
+    cursor: pointer;
+    transition: box-shadow 150ms ease;
+  }
+  .range::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 6px rgba(126, 107, 242, 0.22);
+  }
+  .range::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #f2f4f8;
+    border: 3px solid var(--color-accent);
+    cursor: pointer;
+  }
 }
 
 @layer utilities {

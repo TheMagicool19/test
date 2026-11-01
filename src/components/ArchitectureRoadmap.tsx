@@ -15,6 +15,7 @@ import {
   Terminal,
   ExternalLink
 } from 'lucide-react';
+import { PageShell, PageHeader, StatusDot, Segmented } from './ui/Page';
 
 export const ArchitectureRoadmap: React.FC = () => {
   const [activeSnippet, setActiveSnippet] = useState<'gas' | 'colab' | 'telegram'>('gas');
@@ -123,223 +124,215 @@ print(f"[*] F.O.R.G.E. Tunnel Attivo: {http_tunnel.public_url}")
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-teal-950 border border-teal-800 text-teal-400">
-              SPECIFICHE TECNICHE & ROADMAP V1.0
-            </span>
-            <span className="text-xs font-mono text-slate-400">
-              SISTEMA GESTIONALE AD AGENTI & MICROSERVIZI
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold font-mono text-white mt-1">
-            ARCHITETTURA DI SISTEMA NAVICELLA
-          </h1>
-          <p className="text-xs text-slate-400 font-sans mt-0.5 max-w-3xl">
-            Sintesi dell'architettura multi-modulo, pipeline di smistamento semantico N.I.C.O., 
-            matrice di deployment nelle 4 fasi operative e codice sorgente bridge pronto all'uso.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs font-mono text-teal-300 bg-teal-950/60 px-3 py-1.5 rounded-lg border border-teal-800">
-          <Layers className="w-4 h-4 text-teal-400" />
-          <span>Fasi 1-4 Attive nel Simulatore</span>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        code="Specifiche tecniche · V1.0"
+        title="Architettura di sistema Navicella"
+        description={
+          <>
+            Architettura multi-modulo, pipeline di smistamento semantico N.I.C.O., matrice di
+            deployment nelle 4 fasi operative e sorgenti bridge pronti all&apos;uso.
+          </>
+        }
+        aside={<StatusDot label="Fasi 1–4 attive" />}
+      />
 
       {/* Visual Architectural Map */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 space-y-4">
-        <h3 className="text-xs font-bold font-mono text-teal-300 uppercase tracking-wider flex items-center gap-2">
-          <Layers className="w-4 h-4 text-teal-400" /> SCHEMA ARCHITETTURALE FLUSSO DATI (DATA-FLOW V1.0)
-        </h3>
+      <section className="surface surface-edge space-y-4 p-5">
+        <h2 className="flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-dim">
+          <Layers className="h-3.5 w-3.5" /> Schema architetturale · data-flow V1.0
+        </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
-          {/* Layer 1: Ingestion */}
-          <div className="p-4 rounded-xl border border-sky-900/50 bg-slate-950/80 space-y-2">
-            <div className="text-sky-400 font-bold text-sm flex items-center gap-1.5">
-              <Send className="w-4 h-4" /> 1. INGESTION & GATEWAY
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {/* Layer 1 */}
+          <div className="surface-2 space-y-2 p-4">
+            <div className="flex items-center gap-2">
+              <span className="grid h-6 w-6 place-items-center rounded-md border border-accent/30 bg-accent/10 font-mono text-[10px] font-bold text-accent-soft">
+                1
+              </span>
+              <span className="text-[12px] font-semibold text-ink">Ingestion &amp; gateway</span>
             </div>
-            <div className="text-slate-300 font-sans text-xs">
-              <strong>E.R.M.E.S.</strong> riceve webhook Telegram asincroni (Testo, Note Audio Whisper, Immagini Vision OCR).
-            </div>
-            <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800">
-              &bull; Whitelist check O(1) immediato<br/>
-              &bull; Sanitizzazione payload POST
-            </div>
+            <p className="text-[11.5px] leading-relaxed text-ink-soft">
+              <strong className="font-semibold text-ink">E.R.M.E.S.</strong> riceve webhook Telegram
+              asincroni: testo, note audio Whisper, immagini con OCR.
+            </p>
+            <ul className="space-y-1 border-t border-white/[0.05] pt-2 font-mono text-[10px] text-ink-dim">
+              <li>· Whitelist check O(1)</li>
+              <li>· Sanitizzazione payload POST</li>
+            </ul>
           </div>
 
-          {/* Layer 2: Brain Router */}
-          <div className="p-4 rounded-xl border border-cyan-900/50 bg-slate-950/80 space-y-2">
-            <div className="text-cyan-400 font-bold text-sm flex items-center gap-1.5">
-              <Cpu className="w-4 h-4" /> 2. BRAIN & ORCHESTRATOR
+          {/* Layer 2 */}
+          <div className="surface-2 space-y-2 p-4">
+            <div className="flex items-center gap-2">
+              <span className="grid h-6 w-6 place-items-center rounded-md border border-accent/30 bg-accent/10 font-mono text-[10px] font-bold text-accent-soft">
+                2
+              </span>
+              <span className="text-[12px] font-semibold text-ink">Brain &amp; orchestrator</span>
             </div>
-            <div className="text-slate-300 font-sans text-xs">
-              <strong>N.I.C.O.</strong> esegue Intent Classification e produce JSON strutturato con Function Calling.
-            </div>
-            <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800">
-              &bull; Memoria breve (10 turni Telegram)<br/>
-              &bull; Memoria lunga (RAG D.N.A.)<br/>
-              &bull; Guardrails anti-prompt injection
-            </div>
+            <p className="text-[11.5px] leading-relaxed text-ink-soft">
+              <strong className="font-semibold text-ink">N.I.C.O.</strong> esegue intent
+              classification e produce JSON strutturato via function calling.
+            </p>
+            <ul className="space-y-1 border-t border-white/[0.05] pt-2 font-mono text-[10px] text-ink-dim">
+              <li>· Memoria breve: 10 turni</li>
+              <li>· Memoria lunga: RAG D.N.A.</li>
+              <li>· Guardrail anti prompt-injection</li>
+            </ul>
           </div>
 
-          {/* Layer 3: Execution Services */}
-          <div className="p-4 rounded-xl border border-emerald-900/50 bg-slate-950/80 space-y-2">
-            <div className="text-emerald-400 font-bold text-sm flex items-center gap-1.5">
-              <Database className="w-4 h-4" /> 3. STORAGE & COMPUTE
+          {/* Layer 3 */}
+          <div className="surface-2 space-y-2 p-4">
+            <div className="flex items-center gap-2">
+              <span className="grid h-6 w-6 place-items-center rounded-md border border-accent/30 bg-accent/10 font-mono text-[10px] font-bold text-accent-soft">
+                3
+              </span>
+              <span className="text-[12px] font-semibold text-ink">Storage &amp; compute</span>
             </div>
-            <div className="text-slate-300 font-sans text-xs">
-              Smistamento parallelo ai microservizi specializzati della piattaforma:
-            </div>
-            <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800 space-y-0.5">
-              <div>&bull; <strong>D.N.A.:</strong> Obsidian Vault & Vettori</div>
-              <div>&bull; <strong>L.E.W.I.S.:</strong> RDKit & Feynman</div>
-              <div>&bull; <strong>F.O.R.G.E.:</strong> Colab GPU & DeepSeek</div>
-              <div>&bull; <strong>R.O.U.T.E.:</strong> Calendar & Turni</div>
-              <div>&bull; <strong>F.A.R.A.D.A.Y.:</strong> Bio-State Override</div>
-              <div>&bull; <strong>L.E.D.G.E.R.:</strong> Sheets & Runway</div>
-            </div>
+            <p className="text-[11.5px] leading-relaxed text-ink-soft">
+              Smistamento parallelo ai microservizi specializzati:
+            </p>
+            <ul className="grid grid-cols-1 gap-0.5 border-t border-white/[0.05] pt-2 font-mono text-[10px] text-ink-dim">
+              <li>· D.N.A. — vault &amp; vettori</li>
+              <li>· L.E.W.I.S. — RDKit &amp; Feynman</li>
+              <li>· F.O.R.G.E. — GPU &amp; DeepSeek</li>
+              <li>· R.O.U.T.E. — calendar &amp; turni</li>
+              <li>· F.A.R.A.D.A.Y. — bio-state</li>
+              <li>· L.E.D.G.E.R. — sheets &amp; runway</li>
+            </ul>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* 4 Phases Deployment Roadmap Table */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 space-y-4">
-        <h3 className="text-xs font-bold font-mono text-teal-300 uppercase tracking-wider">
-          ROADMAP DI DEPLOYMENT (SEZIONE 4 DELLE SPECIFICHE)
-        </h3>
+      <section className="surface surface-edge space-y-4 p-5">
+        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-dim">
+          Roadmap di deployment · sezione 4
+        </h2>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left font-mono text-xs border-collapse">
+          <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-500 text-[11px] uppercase">
-                <th className="py-2.5 px-3">Fase</th>
-                <th className="py-2.5 px-3">Denominazione</th>
-                <th className="py-2.5 px-3">Moduli Coinvolti</th>
-                <th className="py-2.5 px-3">Attività Chiave</th>
-                <th className="py-2.5 px-3 text-right">Stato</th>
+              <tr className="border-b border-hairline">
+                {['Fase', 'Denominazione', 'Moduli', 'Attività chiave', 'Stato'].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`whitespace-nowrap px-3 py-2.5 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-ink-dim ${
+                      i === 4 ? 'text-right' : ''
+                    }`}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              <tr className="hover:bg-slate-900/40">
-                <td className="py-3 px-3 font-bold text-cyan-400">Fase 1</td>
-                <td className="py-3 px-3 text-white font-bold">MVP Ingestion</td>
-                <td className="py-3 px-3 text-sky-400">E.R.M.E.S.</td>
-                <td className="py-3 px-3 text-slate-300 font-sans">
-                  Setup ambiente serverless, configurazione bot Telegram (BotFather), validazione webhook POST bidirezionali. Deploy Echo-Bot.
-                </td>
-                <td className="py-3 px-3 text-right">
-                  <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px]">
-                    COMPLETATA
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="hover:bg-slate-900/40">
-                <td className="py-3 px-3 font-bold text-cyan-400">Fase 2</td>
-                <td className="py-3 px-3 text-white font-bold">Brain & Routing</td>
-                <td className="py-3 px-3 text-cyan-400">N.I.C.O.</td>
-                <td className="py-3 px-3 text-slate-300 font-sans">
-                  Integrazione API LLM (Gemini 3.8 Flash). Creazione schemi JSON Schema per Function Calling. Test intent classification.
-                </td>
-                <td className="py-3 px-3 text-right">
-                  <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px]">
-                    COMPLETATA
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="hover:bg-slate-900/40">
-                <td className="py-3 px-3 font-bold text-cyan-400">Fase 3</td>
-                <td className="py-3 px-3 text-white font-bold">DB & Logistica</td>
-                <td className="py-3 px-3 text-emerald-400">D.N.A., R.O.U.T.E., L.E.D.G.E.R.</td>
-                <td className="py-3 px-3 text-slate-300 font-sans">
-                  Sviluppo API CRUD con Google Apps Script. Deploy Vector Database ed embedding documenti Markdown Obsidian pre-esistenti.
-                </td>
-                <td className="py-3 px-3 text-right">
-                  <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px]">
-                    COMPLETATA
-                  </span>
-                </td>
-              </tr>
-
-              <tr className="hover:bg-slate-900/40">
-                <td className="py-3 px-3 font-bold text-cyan-400">Fase 4</td>
-                <td className="py-3 px-3 text-white font-bold">Advanced Compute</td>
-                <td className="py-3 px-3 text-orange-400">L.E.W.I.S., F.O.R.G.E., F.A.R.A.D.A.Y.</td>
-                <td className="py-3 px-3 text-slate-300 font-sans">
-                  Container Docker per Ollama (DeepSeek-R1 locale) e test tunneling SSH verso notebook GPU A100 per docking molecolare.
-                </td>
-                <td className="py-3 px-3 text-right">
-                  <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px]">
-                    OPERATIVA
-                  </span>
-                </td>
-              </tr>
+            <tbody className="divide-y divide-white/[0.05]">
+              {[
+                {
+                  phase: 'Fase 1',
+                  name: 'MVP ingestion',
+                  mods: 'E.R.M.E.S.',
+                  desc: 'Setup ambiente serverless, configurazione bot Telegram (BotFather), validazione webhook POST bidirezionali. Deploy Echo-Bot.',
+                  status: 'COMPLETATA',
+                },
+                {
+                  phase: 'Fase 2',
+                  name: 'Brain & routing',
+                  mods: 'N.I.C.O.',
+                  desc: 'Integrazione API LLM (Gemini Flash). Schemi JSON Schema per function calling. Test di intent classification.',
+                  status: 'COMPLETATA',
+                },
+                {
+                  phase: 'Fase 3',
+                  name: 'DB & logistica',
+                  mods: 'D.N.A., R.O.U.T.E., L.E.D.G.E.R.',
+                  desc: 'API CRUD con Google Apps Script. Deploy del vector database e embedding delle note Markdown Obsidian.',
+                  status: 'COMPLETATA',
+                },
+                {
+                  phase: 'Fase 4',
+                  name: 'Advanced compute',
+                  mods: 'L.E.W.I.S., F.O.R.G.E., F.A.R.A.D.A.Y.',
+                  desc: 'Container Docker per Ollama (DeepSeek-R1 locale) e tunnel SSH verso notebook GPU A100 per docking molecolare.',
+                  status: 'OPERATIVA',
+                },
+              ].map((row) => (
+                <tr key={row.phase} className="transition-colors hover:bg-white/[0.02]">
+                  <td className="whitespace-nowrap px-3 py-3 font-mono text-[11px] font-semibold text-accent-soft">
+                    {row.phase}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-[12px] font-medium text-ink">
+                    {row.name}
+                  </td>
+                  <td className="px-3 py-3 font-mono text-[10px] uppercase tracking-[0.06em] text-ink-dim">
+                    {row.mods}
+                  </td>
+                  <td className="px-3 py-3 text-[11.5px] leading-relaxed text-ink-soft">{row.desc}</td>
+                  <td className="px-3 py-3 text-right">
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-emerald-500/25 bg-emerald-500/[0.08] px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.06em] text-emerald-300/90">
+                      <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                      {row.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
       {/* Code Snippets & Deployment Connectors */}
-      <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <FileCode2 className="w-5 h-5 text-teal-400" />
-            <h3 className="font-bold font-mono text-slate-100 text-sm">
-              SORGENTI PRONTI AL DEPLOYMENT ESTERNO
-            </h3>
+      <section className="surface surface-edge space-y-4 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-7 w-7 place-items-center rounded-lg border border-hairline bg-white/[0.04] text-ink-soft">
+              <FileCode2 className="h-3.5 w-3.5" />
+            </span>
+            <div className="leading-tight">
+              <div className="label-micro">Deployment</div>
+              <h2 className="mt-0.5 text-[13px] font-semibold text-ink">Sorgenti pronti all&apos;uso</h2>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-slate-800 text-xs font-mono">
-            <button
-              onClick={() => setActiveSnippet('gas')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all ${
-                activeSnippet === 'gas' ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
-              }`}
-            >
-              Google Apps Script (GAS)
-            </button>
-            <button
-              onClick={() => setActiveSnippet('colab')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all ${
-                activeSnippet === 'colab' ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
-              }`}
-            >
-              Google Colab SSH
-            </button>
-            <button
-              onClick={() => setActiveSnippet('telegram')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all ${
-                activeSnippet === 'telegram' ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
-              }`}
-            >
-              Telegram Setup
-            </button>
-          </div>
+          <Segmented
+            value={activeSnippet}
+            onChange={(id) => setActiveSnippet(id as 'gas' | 'colab' | 'telegram')}
+            options={[
+              { id: 'gas', label: 'Apps Script' },
+              { id: 'colab', label: 'Colab SSH' },
+              { id: 'telegram', label: 'Telegram' },
+            ]}
+          />
         </div>
 
         <div className="relative">
           <button
-            onClick={() => handleCopy(
-              activeSnippet === 'gas' ? gasScriptCode : activeSnippet === 'colab' ? colabScriptCode : telegramSetupInstructions
-            )}
-            className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold font-mono shadow-md shadow-teal-600/30 z-10 transition-all hover:scale-105"
+            onClick={() =>
+              handleCopy(
+                activeSnippet === 'gas'
+                  ? gasScriptCode
+                  : activeSnippet === 'colab'
+                    ? colabScriptCode
+                    : telegramSetupInstructions
+              )
+            }
+            className="btn-ghost absolute right-3 top-3 z-10"
           >
-            {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? 'Copiato!' : 'Copia Codice'}
+            {copied ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+            {copied ? 'Copiato' : 'Copia'}
           </button>
 
-          <pre className="p-4 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 font-mono text-xs overflow-x-auto leading-relaxed max-h-[380px]">
+          <pre className="max-h-[380px] overflow-x-auto rounded-lg border border-hairline bg-void/70 p-4 font-mono text-[11.5px] leading-relaxed text-ink-soft">
             {activeSnippet === 'gas' && gasScriptCode}
             {activeSnippet === 'colab' && colabScriptCode}
             {activeSnippet === 'telegram' && telegramSetupInstructions}
           </pre>
         </div>
-      </div>
-    </div>
+      </section>
+    </PageShell>
   );
 };

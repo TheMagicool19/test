@@ -184,8 +184,8 @@ export default function App() {
         <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-void to-transparent" />
       </div>
 
-      {/* ---- Chrome applicativo (sticky) ---- */}
-      <div className="sticky top-0 z-40">
+      {/* ---- Chrome applicativo (fascia piena, sticky) ---- */}
+      <div className="sticky top-0 z-40 shadow-[0_12px_32px_-20px_rgba(0,0,0,0.95)]">
         <HeaderHUD
           telemetry={telemetry}
           activeModuleTitle={moduleTitles[activeModule]}

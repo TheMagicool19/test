@@ -78,7 +78,7 @@ export const HeaderHUD: React.FC<HeaderHUDProps> = ({ telemetry, activeModuleTit
       : 'bg-emerald-400';
 
   return (
-    <header className="relative border-b border-hairline bg-void/75 backdrop-blur-xl select-none">
+    <header className="relative border-b border-hairline bg-panel select-none">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
         {/* ---- Brand ---- */}
         <div className="flex shrink-0 items-center gap-3">

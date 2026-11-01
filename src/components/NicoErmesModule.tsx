@@ -21,6 +21,7 @@ import {
 import { RoutingLogItem } from '../types/navicella';
 import { transcribeAudio, analyzeVision, updateWhitelist, fetchWhitelist } from '../services/api';
 import nicoCoreImg from '../assets/images/nico_core_hologram_1793542128851.jpg';
+import { PageShell, PageHeader, Segmented } from './ui/Page';
 
 interface NicoErmesModuleProps {
   onSendMessage: (text: string, source: 'TELEGRAM_TEXT' | 'TELEGRAM_VOICE' | 'TELEGRAM_IMAGE') => Promise<any>;
@@ -179,66 +180,31 @@ export const NicoErmesModule: React.FC<NicoErmesModuleProps> = ({
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Module Title Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-sky-950 border border-sky-800 text-sky-400">
-              ORCHESTRATORE CENTRALE & GATEWAY C-01
-            </span>
-            <span className="text-xs font-mono text-slate-400">
-              FUNCTION CALLING &bull; WHITELIST O(1)
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold font-mono text-white mt-1">
-            N.I.C.O. & E.R.M.E.S. GATEWAY
-          </h1>
-          <p className="text-xs text-slate-400 font-sans mt-0.5 max-w-3xl">
-            Punto unico di ingestion per messaggi testo, note vocali (Whisper/Gemini) e immagini (OCR/SMILES). 
-            N.I.C.O. esegue la classificazione dell'intento e genera output JSON tipizzati con Function Calling.
-          </p>
-        </div>
-
-        {/* Sub-tab navigation */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-slate-800 text-xs font-mono">
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`px-3.5 py-2 rounded-lg font-bold transition-all ${
-              activeTab === 'chat' ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/80'
-            }`}
-          >
-            Telegram Console
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('inspector');
-              if (!selectedLog && logs.length > 0) setSelectedLog(logs[0]);
-            }}
-            className={`px-3.5 py-2 rounded-lg font-bold transition-all ${
-              activeTab === 'inspector' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/80'
-            }`}
-          >
-            JSON Router Inspector
-          </button>
-          <button
-            onClick={() => setActiveTab('whitelist')}
-            className={`px-3.5 py-2 rounded-lg font-bold transition-all ${
-              activeTab === 'whitelist' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/80'
-            }`}
-          >
-            Whitelist Auth
-          </button>
-          <button
-            onClick={() => setActiveTab('webhook')}
-            className={`px-3.5 py-2 rounded-lg font-bold transition-all ${
-              activeTab === 'webhook' ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/80'
-            }`}
-          >
-            Webhook API
-          </button>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        code="C-01 · E.R.M.E.S. + N.I.C.O."
+        title="Gateway & orchestrator"
+        description={
+          <>
+            Punto unico di ingestion per messaggi testuali, note vocali (Whisper) e immagini (OCR).
+            N.I.C.O. classifica l&apos;intento e genera output JSON tipizzati via function calling.
+          </>
+        }
+        aside={
+          <Segmented
+            value={activeTab}
+            onChange={(id) =>
+              setActiveTab(id as 'chat' | 'inspector' | 'whitelist' | 'webhook')
+            }
+            options={[
+              { id: 'chat', label: 'Console' },
+              { id: 'inspector', label: 'Router JSON' },
+              { id: 'whitelist', label: 'Whitelist' },
+              { id: 'webhook', label: 'Webhook' },
+            ]}
+          />
+        }
+      />
 
       {/* Main Tab Content */}
       {activeTab === 'chat' && (
@@ -712,6 +678,6 @@ export const NicoErmesModule: React.FC<NicoErmesModuleProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 };

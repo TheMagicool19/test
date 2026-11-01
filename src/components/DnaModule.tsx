@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { DnaNote } from '../types/navicella';
 import { runEnzymaticFilter } from '../services/api';
+import { PageShell, PageHeader, StatusDot, inputClass } from './ui/Page';
 
 const INITIAL_NOTES: DnaNote[] = [
   {
@@ -192,32 +193,19 @@ export const DnaModule: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-400">
-              C-02: D.N.A. (KNOWLEDGE VAULT & RAG)
-            </span>
-            <span className="text-xs font-mono text-slate-400">
-              OBSIDIAN VAULT &bull; FILTRO ENZIMATICO &bull; COSINE SIMILARITY
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold font-mono text-white mt-1">
-            D.N.A. KNOWLEDGE VAULT & RAG RETRIEVAL
-          </h1>
-          <p className="text-xs text-slate-400 font-sans mt-0.5 max-w-3xl">
-            Base di conoscenza e memoria a lungo termine sincronizzata con Obsidian (Markdown + YAML Frontmatter). 
-            Il Filtro Enzimatico ascolta le note grezze e le tipizza; il Vector DB indicizza i frammenti per le query di N.I.C.O.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs font-mono text-emerald-300 bg-emerald-950/60 px-3 py-1.5 rounded-lg border border-emerald-800">
-          <Database className="w-4 h-4 text-emerald-400" />
-          <span>Vault: 3 Note Attive &bull; Embeddings: OK</span>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        code="C-02 · D.N.A."
+        title="Knowledge vault & RAG retrieval"
+        description={
+          <>
+            Memoria a lungo termine sincronizzata con Obsidian (Markdown + YAML frontmatter). Il
+            filtro enzimatico tipizza le note grezze, il vector DB indicizza i chunk per le query di
+            N.I.C.O.
+          </>
+        }
+        aside={<StatusDot label="Vault 3 note · embeddings ok" />}
+      />
 
       {/* Main Grid: Vault Explorer (Left) & Note Preview (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -233,8 +221,8 @@ export const DnaModule: React.FC = () => {
                 setSearchQuery(e.target.value);
                 handleRagSearch(e.target.value);
               }}
-              placeholder="Cerca per titolo, tag o query semantica RAG..."
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+              placeholder="Cerca per titolo, tag o query semantica…"
+              className={`${inputClass} pl-9`}
             />
           </div>
 
@@ -261,42 +249,43 @@ export const DnaModule: React.FC = () => {
           )}
 
           {/* Notes List in Obsidian Style */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
-            <div className="flex items-center justify-between text-xs font-mono text-slate-400 border-b border-slate-800 pb-2">
-              <span className="flex items-center gap-1.5 text-slate-300 font-bold">
-                <Folder className="w-3.5 h-3.5 text-emerald-400" /> OBSIDIAN VAULT (VAULT/CTF/)
+          <div className="surface space-y-3 p-4">
+            <div className="flex items-center justify-between border-b border-hairline pb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-ink-dim">
+              <span className="flex items-center gap-1.5 font-semibold text-ink-soft">
+                <Folder className="h-3.5 w-3.5" /> Obsidian vault
               </span>
               <span>{filteredNotes.length} file .md</span>
             </div>
 
-            <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+            <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
               {filteredNotes.map((note) => (
                 <div
                   key={note.id}
                   onClick={() => setSelectedNote(note)}
-                  className={`p-3 rounded-lg border text-xs cursor-pointer transition-colors space-y-1.5 ${
+                  className={`cursor-pointer space-y-1.5 rounded-lg border p-3 transition-colors ${
                     selectedNote.id === note.id
-                      ? 'bg-emerald-950/70 border-emerald-500/80 text-emerald-200'
-                      : 'bg-slate-950/60 border-slate-800/90 text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                      ? 'border-accent/40 bg-accent/[0.08]'
+                      : 'border-hairline bg-white/[0.02] hover:border-hairline-strong hover:bg-white/[0.04]'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold font-mono text-slate-100 flex items-center gap-1.5 truncate">
-                      <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-1.5 truncate text-[12px] font-medium text-ink">
+                      <FileText className="h-3.5 w-3.5 shrink-0 text-ink-dim" />
                       {note.title}
                     </span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-slate-400">
+                    <span className="shrink-0 rounded border border-hairline bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.06em] text-ink-dim">
                       {note.type}
                     </span>
                   </div>
 
-                  <div className="text-[11px] font-mono text-slate-500 truncate">
-                    {note.path}
-                  </div>
+                  <div className="truncate font-mono text-[10px] text-ink-dim">{note.path}</div>
 
-                  <div className="flex flex-wrap gap-1 mt-1">
+                  <div className="flex flex-wrap gap-1 pt-0.5">
                     {note.tags.map((t, idx) => (
-                      <span key={idx} className="text-[10px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-400 border border-slate-800 font-mono">
+                      <span
+                        key={idx}
+                        className="rounded border border-hairline bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] text-ink-dim"
+                      >
                         #{t}
                       </span>
                     ))}
@@ -307,41 +296,42 @@ export const DnaModule: React.FC = () => {
           </div>
 
           {/* Test Enzymatic Filter Box */}
-          <div className="rounded-xl border border-emerald-900/50 bg-slate-900/60 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold font-mono text-emerald-300 flex items-center gap-1.5 uppercase">
-                <Sparkles className="w-4 h-4 text-emerald-400" /> FILTRO ENZIMATICO LIVE DEMO
+          <div className="surface space-y-3 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
+                <Sparkles className="h-3.5 w-3.5 text-accent-soft" /> Filtro enzimatico · demo live
               </h3>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
-                Temp: 0.0
+              <span className="rounded border border-hairline bg-white/[0.03] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.06em] text-ink-dim">
+                temp 0.0
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-sans">
-              Incolla una nota grezza da Inbox: l'LLM estrarrà entità chimico-tossicologiche e genererà il frontmatter tipizzato.
+            <p className="text-[11px] leading-relaxed text-ink-dim">
+              Incolla una nota grezza dall&apos;inbox: l&apos;LLM estrae le entità
+              chimico-tossicologiche e genera il frontmatter tipizzato.
             </p>
 
             <textarea
               value={rawInput}
               onChange={(e) => setRawInput(e.target.value)}
               rows={3}
-              placeholder="Incolla nota grezza qui..."
-              className="w-full p-2.5 rounded bg-slate-950 border border-slate-700 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500"
+              placeholder="Incolla nota grezza qui…"
+              className={`${inputClass} resize-none font-mono text-[11px] leading-relaxed`}
             />
 
             <button
               onClick={handleRunEnzymaticFilter}
               disabled={isFiltering}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold transition-all shadow-lg shadow-emerald-600/30 disabled:opacity-50 flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
+              className="btn-primary w-full py-2.5"
             >
               {isFiltering ? (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  Elaborazione Enzimatica in Corso...
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  Elaborazione in corso…
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Esegui Filtro Enzimatico & Salva nel Vault
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Esegui filtro &amp; salva nel vault
                 </>
               )}
             </button>
@@ -349,41 +339,40 @@ export const DnaModule: React.FC = () => {
         </div>
 
         {/* Right Column (7 Cols): Markdown File Editor / Viewer */}
-        <div className="lg:col-span-7 rounded-xl border border-slate-800 bg-slate-950/80 p-5 flex flex-col space-y-4">
+        <div className="surface flex flex-col space-y-4 p-5 lg:col-span-7">
           {/* Note Metadata Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-            <div>
-              <div className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
-                <span>PATH:</span> <span className="text-slate-300">{selectedNote.path}</span>
+          <div className="flex flex-wrap items-start justify-between gap-2 border-b border-hairline pb-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.08em] text-ink-dim">
+                <span>path</span>
+                <span className="truncate normal-case text-ink-soft">{selectedNote.path}</span>
               </div>
-              <h2 className="text-lg font-bold font-mono text-white mt-0.5">
-                {selectedNote.title}
-              </h2>
+              <h2 className="mt-1 text-[15px] font-semibold text-ink">{selectedNote.title}</h2>
             </div>
 
-            <div className="flex items-center gap-2 font-mono text-[11px]">
-              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+            <div className="flex shrink-0 items-center gap-2 font-mono text-[10px]">
+              <span className="rounded border border-emerald-500/25 bg-emerald-500/[0.08] px-1.5 py-0.5 uppercase tracking-[0.06em] text-emerald-300/90">
                 {selectedNote.status}
               </span>
-              <span className="text-slate-500">
-                {new Date(selectedNote.created).toLocaleDateString()}
+              <span className="text-ink-dim">
+                {new Date(selectedNote.created).toLocaleDateString('it-IT')}
               </span>
             </div>
           </div>
 
           {/* Markdown Content Area */}
-          <div className="flex-1 bg-slate-900/60 rounded-lg p-4 border border-slate-800/80 overflow-y-auto max-h-[580px]">
-            <pre className="text-xs font-mono text-slate-300 whitespace-pre-wrap leading-relaxed">
+          <div className="max-h-[580px] flex-1 overflow-y-auto rounded-lg border border-hairline bg-void/60 p-4">
+            <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-ink-soft">
               {selectedNote.content}
             </pre>
           </div>
 
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-500">
-            <span>Sincronizzato con Obsidian Vault (Markdown)</span>
-            <span>RAG Chunking: 512 tokens &bull; Overlap: 50</span>
+          <div className="pt-2 border-t border-hairline/80 flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.08em] text-ink-dim">
+            <span>Sync Obsidian vault</span>
+            <span>Chunking 512 token · overlap 50</span>
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 };
