@@ -148,126 +148,122 @@ export const EnterpriseArchitectureFlow: React.FC<EnterpriseArchitectureFlowProp
   };
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:p-6 space-y-6 shadow-xl">
+    <section className="surface surface-edge space-y-6 overflow-hidden p-5 sm:p-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col justify-between gap-4 border-b border-hairline pb-5 sm:flex-row sm:items-center">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-indigo-950 text-indigo-300 font-bold border border-indigo-700/60 uppercase">
-              TOPOLOGIA MICROSERVIZI AD AGENTI
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="chip">
+              <Layers className="h-2.5 w-2.5 text-accent-soft" />
+              Topologia microservizi
             </span>
-            <span className="text-xs text-slate-400 font-medium">
-              Architettura Distribuita V1.0
+            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-dim">
+              Architettura distribuita V1.0
             </span>
           </div>
-          <h2 className="text-xl font-extrabold text-white font-sans mt-1.5 flex items-center gap-2">
-            <Layers className="w-5 h-5 text-indigo-400" />
-            Topologia Operativa & Orchestrazione N.I.C.O.
+          <h2 className="mt-2 text-[15px] font-semibold tracking-tight text-ink">
+            Topologia operativa e orchestrazione N.I.C.O.
           </h2>
-          <p className="text-xs text-slate-300 font-sans mt-0.5 max-w-3xl">
-            Flusso integrato: ogni input Telegram viene sanificato da E.R.M.E.S., analizzato dal semantic router N.I.C.O. 
-            ed eseguito in parallelo sui 7 microservizi specializzati di gestione, calcolo scientifico e tesoreria.
+          <p className="mt-1 max-w-3xl text-[11.5px] leading-relaxed text-ink-dim">
+            Ogni input Telegram viene sanificato da E.R.M.E.S., classificato dal router semantico
+            N.I.C.O. ed eseguito sui 7 microservizi specializzati di gestione, calcolo scientifico
+            e tesoreria.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200">
-          <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
-          <span>7 Servizi Attivi &bull; Zero Deadlocks</span>
+        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-hairline bg-white/[0.03] px-2.5 py-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-soft">
+            7 servizi attivi
+          </span>
         </div>
       </div>
 
       {/* Central Orchestrator Banner */}
-      <div className="rounded-xl border border-indigo-500/40 bg-gradient-to-r from-indigo-950/60 via-slate-900 to-slate-900 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30 shrink-0">
-            <Bot className="w-6 h-6" />
+      <div className="flex flex-col justify-between gap-4 rounded-xl border border-accent/25 bg-accent/[0.055] p-4 sm:p-5 md:flex-row md:items-center">
+        <div className="flex items-start gap-3.5">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-accent/30 bg-accent/15 text-accent-soft">
+            <Bot className="h-5 w-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-white font-sans">
-                N.I.C.O. Core (Neural Interactive Co-Operator)
-              </h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700 font-mono font-bold">
-                ROUTER ATTIVO
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-[13px] font-semibold text-ink">N.I.C.O. Core</h3>
+              <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-accent-soft">
+                Neural Interactive Co-Operator
+              </span>
+              <span className="flex items-center gap-1.5 font-mono text-[9px] font-semibold uppercase tracking-[0.08em] text-emerald-300/90">
+                <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                Router attivo
               </span>
             </div>
-            <p className="text-xs text-slate-300 font-sans mt-0.5">
-              Motore semantico con <strong>Function Calling strutturato</strong> (Gemini 3.8 Flash): esegue la classificazione dell'intento e smista le chiamate API verso il compartimento dedicato.
+            <p className="mt-1 max-w-2xl text-[11.5px] leading-relaxed text-ink-soft">
+              Motore semantico con <strong className="font-semibold text-ink">function calling strutturato</strong>{' '}
+              (Gemini): esegue la classificazione dell&apos;intento e smista le chiamate API verso il
+              compartimento dedicato.
             </p>
           </div>
         </div>
 
         <button
           onClick={() => handleClick('nico-ermes')}
-          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/25 flex items-center justify-center gap-2 shrink-0 self-start md:self-center"
+          className="btn-primary shrink-0 self-start md:self-center"
         >
-          <span>Apri Console Telegram N.I.C.O.</span>
-          <ArrowRight className="w-4 h-4" />
+          Apri console N.I.C.O.
+          <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      {/* Grid of the 7 Autonomous Microservices */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Grid dei 7 microservizi */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {SERVICE_NODES.map((node) => {
           const Icon = node.icon;
           return (
-            <motion.div
+            <motion.button
               key={node.id}
-              whileHover={{ y: -3 }}
+              type="button"
+              onClick={() => handleClick(node.id)}
+              whileHover={{ y: -2 }}
               transition={{ duration: 0.15 }}
-              className={`rounded-xl border ${node.borderColor} ${node.bgLight} p-4 flex flex-col justify-between transition-all duration-200 shadow-md`}
+              className="surface-2 surface-interactive group flex flex-col justify-between p-4 text-left"
             >
               <div>
-                {/* Header */}
-                <div className="flex items-center justify-between gap-2 mb-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-slate-900/90 border border-slate-700 text-white shrink-0">
-                      <Icon className={`w-4 h-4 ${node.color}`} />
-                    </div>
-                    <div>
-                      <div className={`text-[10px] font-bold font-mono tracking-wider ${node.color}`}>
-                        {node.code}
-                      </div>
-                      <div className="font-bold text-sm text-white font-sans leading-tight">
-                        {node.name}
-                      </div>
-                    </div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline bg-white/[0.04] text-ink-soft transition-colors group-hover:text-accent-soft">
+                    <Icon className="h-4 w-4" />
                   </div>
-
-                  <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-slate-300">
+                  <span className="flex shrink-0 items-center gap-1.5 font-mono text-[9px] font-semibold uppercase tracking-[0.06em] text-ink-dim">
+                    <span className="h-1 w-1 rounded-full bg-emerald-400/80" />
                     {node.status}
                   </span>
                 </div>
 
-                {/* Subtitle category */}
-                <div className="text-[11px] font-medium text-slate-400 font-mono mb-2">
-                  {node.category}
+                <div className="mt-3 flex items-baseline gap-1.5">
+                  <span className="shrink-0 font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-accent-soft/80">
+                    {node.code}
+                  </span>
+                  <span className="truncate text-[12.5px] font-semibold text-ink">
+                    {node.name}
+                  </span>
                 </div>
 
-                {/* Description */}
-                <p className="text-xs text-slate-300 font-sans leading-relaxed">
+                <div className="mt-0.5 font-mono text-[10px] text-ink-dim">{node.category}</div>
+
+                <p className="mt-2 text-[11.5px] leading-relaxed text-ink-soft/85">
                   {node.desc}
                 </p>
               </div>
 
-              {/* Bottom Card Footer with High-Contrast Action Button */}
-              <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                <span className="text-[10px] font-mono text-slate-400 truncate">
-                  {node.throughput}
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/[0.05] pt-2.5">
+                <span className="truncate font-mono text-[10px] text-ink-dim">{node.throughput}</span>
+                <span className="flex shrink-0 items-center gap-1 font-mono text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-dim transition-colors group-hover:text-accent-soft">
+                  Apri
+                  <ArrowRight className="h-3 w-3" />
                 </span>
-
-                <button
-                  onClick={() => handleClick(node.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition-all shadow-sm flex items-center gap-1.5 shrink-0 ${node.btnBg}`}
-                >
-                  <span>Apri</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
               </div>
-            </motion.div>
+            </motion.button>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 };

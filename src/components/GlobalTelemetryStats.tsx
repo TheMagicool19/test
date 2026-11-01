@@ -88,12 +88,12 @@ export const GlobalTelemetryStats: React.FC<GlobalTelemetryStatsProps> = ({ tele
     if (active && payload && payload.length) {
       const point = payload[0].payload as TelemetryPoint;
       return (
-        <div className="rounded-xl border border-cyan-800/80 bg-slate-950/95 p-3.5 shadow-2xl backdrop-blur-md font-mono text-xs space-y-2 min-w-[210px] z-50">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-            <span className="font-bold text-slate-200 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-cyan-400" /> {point.date}
+        <div className="z-50 min-w-[210px] space-y-2 rounded-xl border border-hairline-strong bg-panel/95 p-3.5 font-mono text-xs shadow-xl backdrop-blur-md">
+          <div className="flex items-center justify-between border-b border-hairline pb-1.5">
+            <span className="flex items-center gap-1.5 font-semibold text-ink">
+              <Calendar className="h-3.5 w-3.5 text-accent-soft" /> {point.date}
             </span>
-            <span className="text-[10px] text-slate-400">TELEMETRIA</span>
+            <span className="text-[10px] uppercase tracking-[0.1em] text-ink-dim">Telemetria</span>
           </div>
 
           <div className="space-y-1.5">
@@ -142,37 +142,31 @@ export const GlobalTelemetryStats: React.FC<GlobalTelemetryStatsProps> = ({ tele
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-      className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 space-y-5 shadow-lg relative overflow-hidden"
+      className="surface surface-edge relative space-y-5 overflow-hidden p-5"
     >
-      {/* Light beam scanline entrance sweep */}
-      <motion.div
-        initial={{ x: '-100%', opacity: 0.8 }}
-        animate={{ x: '250%', opacity: 0 }}
-        transition={{ duration: 1.6, ease: 'easeInOut' }}
-        className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent pointer-events-none transform -skew-x-12 z-20"
-      />
-
       {/* Header bar */}
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-3"
+        className="flex flex-col justify-between gap-4 border-b border-hairline pb-4 sm:flex-row sm:items-center"
       >
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-400 uppercase tracking-wider flex items-center gap-1">
-              <Radio className="w-3 h-3 text-cyan-400 animate-spin" /> TELEMETRIA GLOBALE TEMPORALE
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="chip">
+              <Radio className="h-2.5 w-2.5 text-accent-soft" />
+              Telemetria temporale
             </span>
-            <span className="text-xs font-mono text-slate-400">
-              RECHARTS TELEMETRY &bull; STATE OVERLAY
+            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-dim">
+              Recharts · state overlay
             </span>
           </div>
-          <h2 className="text-base font-bold font-mono text-slate-100 flex items-center gap-2 mt-1">
-            <Activity className="w-4 h-4 text-indigo-400" /> METRICHE & TELEMETRIA OPERATIVA
+          <h2 className="mt-2 flex items-center gap-2 text-[13px] font-semibold text-ink">
+            <Activity className="h-3.5 w-3.5 text-ink-soft" />
+            Metriche &amp; telemetria operativa
           </h2>
-          <p className="text-xs text-slate-400 font-sans mt-0.5">
-            Analisi comparativa dell'andamento energetico psicofisico (F.A.R.A.D.A.Y.) e delle uscite finanziarie (L.E.D.G.E.R.) nel tempo.
+          <p className="mt-1 max-w-xl text-[11.5px] leading-relaxed text-ink-dim">
+            Andamento energetico psicofisico (F.A.R.A.D.A.Y.) e uscite finanziarie (L.E.D.G.E.R.) nel tempo.
           </p>
         </div>
 
@@ -334,36 +328,36 @@ export const GlobalTelemetryStats: React.FC<GlobalTelemetryStatsProps> = ({ tele
               margin={{ top: 10, right: 15, left: -10, bottom: 0 }}
             >
               <defs>
-                {/* Faraday gradient */}
+                {/* Faraday gradient — accento */}
                 <linearGradient id="batteryGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0} />
+                  <stop offset="5%" stopColor="#7e6bf2" stopOpacity={0.32} />
+                  <stop offset="95%" stopColor="#7e6bf2" stopOpacity={0.0} />
                 </linearGradient>
 
-                {/* Cumulative Spend gradient */}
+                {/* Cumulative Spend gradient — ice cyan */}
                 <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
+                  <stop offset="5%" stopColor="#45bed6" stopOpacity={0.28} />
+                  <stop offset="95%" stopColor="#45bed6" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
 
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" opacity={1} />
 
               <XAxis 
                 dataKey="dayLabel" 
-                stroke="#64748b" 
-                tick={{ fill: '#94a3b8', fontSize: 11, fontFamily: 'monospace' }}
-                tickLine={{ stroke: '#334155' }}
+                stroke="#2a3038" 
+                tick={{ fill: '#6b7380', fontSize: 10, fontFamily: 'JetBrains Mono Variable, monospace' }}
+                tickLine={{ stroke: '#23272e' }}
               />
 
               {/* Left Y Axis: Battery % */}
               <YAxis
                 yAxisId="left"
                 domain={[0, 100]}
-                stroke="#f43f5e"
-                tick={{ fill: '#fb7185', fontSize: 11, fontFamily: 'monospace' }}
+                stroke="#2a3038"
+                tick={{ fill: '#98a0ac', fontSize: 10, fontFamily: 'JetBrains Mono Variable, monospace' }}
                 tickFormatter={(v) => `${v}%`}
-                tickLine={{ stroke: '#475569' }}
+                tickLine={{ stroke: '#23272e' }}
               />
 
               {/* Right Y Axis: Expenses € */}
@@ -371,10 +365,10 @@ export const GlobalTelemetryStats: React.FC<GlobalTelemetryStatsProps> = ({ tele
                 yAxisId="right"
                 orientation="right"
                 domain={[0, 'dataMax + 50']}
-                stroke="#f59e0b"
-                tick={{ fill: '#fbbf24', fontSize: 11, fontFamily: 'monospace' }}
+                stroke="#2a3038"
+                tick={{ fill: '#98a0ac', fontSize: 10, fontFamily: 'JetBrains Mono Variable, monospace' }}
                 tickFormatter={(v) => `${v}€`}
-                tickLine={{ stroke: '#475569' }}
+                tickLine={{ stroke: '#23272e' }}
               />
 
               <Tooltip content={<CustomTooltip />} />
@@ -405,16 +399,16 @@ export const GlobalTelemetryStats: React.FC<GlobalTelemetryStatsProps> = ({ tele
                   type="monotone"
                   dataKey="battery"
                   name="Faraday Bio-Battery (%)"
-                  stroke="#f43f5e"
-                  strokeWidth={2.5}
+                  stroke="#7e6bf2"
+                  strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#batteryGradient)"
                   isAnimationActive={true}
                   animationDuration={1300}
                   animationEasing="ease-out"
                   animationBegin={150}
-                  dot={{ stroke: '#f43f5e', strokeWidth: 2, fill: '#0f172a', r: 3 }}
-                  activeDot={{ r: 6, stroke: '#fda4af', strokeWidth: 2, fill: '#f43f5e' }}
+                  dot={{ stroke: '#7e6bf2', strokeWidth: 2, fill: '#0c0e12', r: 2.5 }}
+                  activeDot={{ r: 5, stroke: '#a496f8', strokeWidth: 2, fill: '#7e6bf2' }}
                 />
               )}
 
@@ -423,10 +417,10 @@ export const GlobalTelemetryStats: React.FC<GlobalTelemetryStatsProps> = ({ tele
                   yAxisId="right"
                   dataKey="expense"
                   name="Spesa Giornaliera (€)"
-                  fill="#f59e0b"
-                  opacity={0.85}
-                  radius={[4, 4, 0, 0]}
-                  barSize={16}
+                  fill="rgba(255,255,255,0.16)"
+                  opacity={1}
+                  radius={[3, 3, 0, 0]}
+                  barSize={14}
                   isAnimationActive={true}
                   animationDuration={1100}
                   animationEasing="ease-out"
@@ -440,8 +434,8 @@ export const GlobalTelemetryStats: React.FC<GlobalTelemetryStatsProps> = ({ tele
                   type="monotone"
                   dataKey="cumulativeExpense"
                   name="Uscite Cumulate Mese (€)"
-                  stroke="#06b6d4"
-                  strokeWidth={2}
+                  stroke="#45bed6"
+                  strokeWidth={1.75}
                   dot={false}
                   isAnimationActive={true}
                   animationDuration={1400}
@@ -463,13 +457,13 @@ export const GlobalTelemetryStats: React.FC<GlobalTelemetryStatsProps> = ({ tele
       >
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block animate-pulse"></span> F.A.R.A.D.A.Y. Bio-Battery
+            <span className="inline-block h-2 w-2 rounded-full bg-accent"></span> F.A.R.A.D.A.Y. Bio-Battery
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-amber-400 inline-block"></span> Spese Giornaliere
+            <span className="inline-block h-2 w-2 rounded-sm bg-white/25"></span> Spese Giornaliere
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-1 bg-cyan-400 inline-block"></span> Trend Uscite Cumulate
+            <span className="inline-block h-0.5 w-2.5 rounded bg-sky-400"></span> Trend Uscite Cumulate
           </span>
         </div>
         <div className="text-slate-500 flex items-center gap-1">

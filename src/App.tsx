@@ -176,85 +176,105 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col relative selection:bg-indigo-500 selection:text-white">
-      {/* Subtle professional background mesh */}
-      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-slate-950 pointer-events-none z-0"></div>
-      <div className="fixed inset-0 bg-[linear-gradient(to_right,#1e293b0a_1px,transparent_1px),linear-gradient(to_bottom,#1e293b0a_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none z-0"></div>
+    <div className="min-h-screen bg-void text-ink flex flex-col relative antialiased">
+      {/* ---- Atmosfera di fondo: un solo alone + maglia tecnica ---- */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute inset-0 aurora" />
+        <div className="absolute inset-0 bg-grid opacity-60" />
+        <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-void to-transparent" />
+      </div>
 
-      {/* Header Bar */}
-      <HeaderHUD
-        telemetry={telemetry}
-        activeModuleTitle={moduleTitles[activeModule]}
-      />
+      {/* ---- Chrome applicativo (sticky) ---- */}
+      <div className="sticky top-0 z-40">
+        <HeaderHUD
+          telemetry={telemetry}
+          activeModuleTitle={moduleTitles[activeModule]}
+        />
+        <ModuleNav
+          activeModule={activeModule}
+          onSelectModule={setActiveModule}
+          faradayBattery={telemetry?.faradayBattery ?? 68}
+        />
+      </div>
 
-      {/* Module Navigation Tabs */}
-      <ModuleNav
-        activeModule={activeModule}
-        onSelectModule={setActiveModule}
-        faradayBattery={telemetry?.faradayBattery ?? 68}
-      />
+      {/* ---- Contenuto del compartimento attivo ---- */}
+      <main className="flex-1 relative z-10 pb-16">
+        <div key={activeModule} className="animate-fade-in">
+          {activeModule === 'bridge' && (
+            <BridgeOverview
+              telemetry={telemetry}
+              onNavigate={setActiveModule}
+              onExecutePrompt={handleExecutePrompt}
+              recentLogs={logs}
+            />
+          )}
 
-      {/* Active Compartment Main Content */}
-      <main className="flex-1 relative z-10 pb-12">
-        {activeModule === 'bridge' && (
-          <BridgeOverview
-            telemetry={telemetry}
-            onNavigate={setActiveModule}
-            onExecutePrompt={handleExecutePrompt}
-            recentLogs={logs}
-          />
-        )}
+          {activeModule === 'nico-ermes' && (
+            <NicoErmesModule
+              onSendMessage={handleExecutePrompt}
+              logs={logs}
+              whitelistConfig={whitelistConfig}
+              onRefreshWhitelist={loadInitialData}
+            />
+          )}
 
-        {activeModule === 'nico-ermes' && (
-          <NicoErmesModule
-            onSendMessage={handleExecutePrompt}
-            logs={logs}
-            whitelistConfig={whitelistConfig}
-            onRefreshWhitelist={loadInitialData}
-          />
-        )}
+          {activeModule === 'dna' && <DnaModule />}
 
-        {activeModule === 'dna' && <DnaModule />}
+          {activeModule === 'lewis' && <LewisModule />}
 
-        {activeModule === 'lewis' && <LewisModule />}
+          {activeModule === 'forge' && <ForgeModule telemetry={telemetry} />}
 
-        {activeModule === 'forge' && <ForgeModule telemetry={telemetry} />}
+          {activeModule === 'route' && (
+            <RouteModule
+              shifts={telemetry?.activeShifts || []}
+              exams={telemetry?.examsCountdown || []}
+              onAddShift={handleAddShiftDirect}
+            />
+          )}
 
-        {activeModule === 'route' && (
-          <RouteModule
-            shifts={telemetry?.activeShifts || []}
-            exams={telemetry?.examsCountdown || []}
-            onAddShift={handleAddShiftDirect}
-          />
-        )}
+          {activeModule === 'faraday' && (
+            <FaradayModule
+              currentBattery={telemetry?.faradayBattery ?? 68}
+              batteryStatus={telemetry?.faradayStatus ?? 'OPTIMAL'}
+              onBatteryChange={(newBattery) => {
+                setTelemetry((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        faradayBattery: newBattery,
+                        faradayStatus: newBattery < 20 ? 'CRITICAL_OVERRIDE' : newBattery < 50 ? 'MODERATE' : 'OPTIMAL',
+                      }
+                    : null
+                );
+              }}
+            />
+          )}
 
-        {activeModule === 'faraday' && (
-          <FaradayModule
-            currentBattery={telemetry?.faradayBattery ?? 68}
-            batteryStatus={telemetry?.faradayStatus ?? 'OPTIMAL'}
-            onBatteryChange={(newBattery) => {
-              setTelemetry((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      faradayBattery: newBattery,
-                      faradayStatus: newBattery < 20 ? 'CRITICAL_OVERRIDE' : newBattery < 50 ? 'MODERATE' : 'OPTIMAL',
-                    }
-                  : null
-              );
-            }}
-          />
-        )}
+          {activeModule === 'ledger' && (
+            <LedgerModule
+              telemetry={telemetry}
+              onAddExpenseDirect={handleAddExpenseDirect}
+            />
+          )}
 
-        {activeModule === 'ledger' && (
-          <LedgerModule
-            telemetry={telemetry}
-            onAddExpenseDirect={handleAddExpenseDirect}
-          />
-        )}
-
-        {activeModule === 'architecture' && <ArchitectureRoadmap />}
+          {activeModule === 'architecture' && <ArchitectureRoadmap />}
+        </div>
       </main>
+
+      {/* ---- Status bar inferiore: chiusura visiva della shell ---- */}
+      <footer className="relative z-10 border-t border-hairline bg-void/80 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-dim sm:px-6">
+          <span>Navicella V1.0 · Enterprise Suite</span>
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Core operativo
+            </span>
+            <span className="text-hairline-strong">/</span>
+            <span>N.I.C.O. Router</span>
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }
