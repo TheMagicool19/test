@@ -1,0 +1,7 @@
+{
+  "name": "Navicella V1.0 - Sistema Gestionale ad Agenti",
+  "description": "Sistema gestionale aerospaziale ad agenti (N.I.C.O., E.R.M.E.S., D.N.A., L.E.W.I.S., F.O.R.G.E., R.O.U.T.E., F.A.R.A.D.A.Y., L.E.D.G.E.R.) per workflow Telegram, RAG e sintesi accademica/ricerca.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
