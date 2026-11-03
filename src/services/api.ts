@@ -1,8 +1,10 @@
 import {
   ExamPayload,
+  GoogleCalendarStatus,
   ParsedExam,
   RouteAgenda,
   RouteExamsResponse,
+  RouteOverview,
   RouteParseResult,
   RouteShiftsResponse,
   RoutingLogItem,
@@ -229,4 +231,25 @@ export async function parseExamText(
     body: JSON.stringify({ text }),
   });
   return readJson(res, "Parsing dell'esame non riuscito.");
+}
+
+// ---------------------------------------------------------------------------
+// C-05c: R.O.U.T.E. — orizzonte, segnalazioni e Google Calendar
+// ---------------------------------------------------------------------------
+
+export async function fetchRouteOverview(days = 60): Promise<RouteOverview> {
+  const res = await fetch(`/api/route/overview?days=${encodeURIComponent(days)}`);
+  return readJson(res, 'Impossibile calcolare la vista dei prossimi giorni.');
+}
+
+export async function fetchGoogleStatus(): Promise<GoogleCalendarStatus> {
+  const res = await fetch('/api/google/status');
+  return readJson(res, 'Stato Google Calendar non disponibile.');
+}
+
+export async function syncGoogleCalendar(): Promise<
+  GoogleCalendarStatus & { shiftSynced?: number; examSynced?: number }
+> {
+  const res = await fetch('/api/google/sync', { method: 'POST' });
+  return readJson(res, 'Sincronizzazione con Google Calendar non riuscita.');
 }

@@ -8,7 +8,10 @@
     "build": "vite build",
     "start": "tsx server.ts",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "google:auth": "node scripts/google-auth.mjs",
+    "google:code": "node scripts/google-code.mjs",
+    "google:check": "node scripts/google-check.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

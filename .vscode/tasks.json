@@ -7,6 +7,30 @@
 			"command": "npm run dev",
 			"isBackground": true,
 			"problemMatcher": []
+		},
+		{
+			"label": "Google: autorizza Calendar",
+			"type": "shell",
+			"command": "npm run google:auth",
+			"problemMatcher": []
+		},
+		{
+			"label": "Google: incolla codice di ritorno",
+			"type": "shell",
+			"command": "npm run google:code",
+			"problemMatcher": []
+		},
+		{
+			"label": "Google: verifica credenziali",
+			"type": "shell",
+			"command": "npm run google:check",
+			"problemMatcher": []
+		},
+		{
+			"label": "Google: sincronizza eventi",
+			"type": "shell",
+			"command": "curl -s -X POST http://localhost:3000/api/google/sync",
+			"problemMatcher": []
 		}
 	]
 }
