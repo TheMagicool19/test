@@ -3,6 +3,33 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
+import {
+  parseExams,
+  parseShifts,
+  toISODate,
+  startOfWeek,
+  addDays,
+  WEEKDAY_NAMES,
+  parseISODate,
+} from './server/routeParser.ts';
+import {
+  buildAgenda,
+  createExam,
+  createShift,
+  deleteExam,
+  deleteShift,
+  findConflicts,
+  listExams,
+  listShifts,
+  listUpcomingExams,
+  listUpcomingLegacy,
+  storeMeta,
+  updateExam,
+  updateShift,
+  type ExamInput,
+  type ShiftInput,
+  type ShiftCategory,
+} from './server/routeEngine.ts';
 
 dotenv.config();
 
@@ -52,14 +79,9 @@ const systemState = {
   monthlyBudget: 850,
   currentBalance: 6280,
   monthlySpend: 412,
-  activeShifts: [
-    { id: 'sh-1', day: 'Lunedì', date: '2026-11-02', start: '14:00', end: '18:00', role: 'Turno Clinico / Farmacia' },
-    { id: 'sh-2', day: 'Mercoledì', date: '2026-11-04', start: '09:00', end: '13:00', role: 'Laboratorio Sintesi' },
-  ],
-  examsCountdown: [
-    { id: 'ex-1', subject: 'Chimica Tossicologica & Forense (CTF)', date: '2026-11-20', daysLeft: 19 },
-    { id: 'ex-2', subject: 'Farmacologia Molecolare Applicata', date: '2026-12-05', daysLeft: 34 },
-  ],
+  activeShifts: listUpcomingLegacy(),
+  /** Countdown derivato dallo store: gli esami non sono più hardcoded */
+  examsCountdown: listUpcomingExams(6),
   gpuColabStatus: {
     status: 'ONLINE',
     device: 'NVIDIA A100-SXM4-40GB',
@@ -70,6 +92,15 @@ const systemState = {
     vramUsed: '13.8 GB / 40.0 GB',
   },
 };
+
+/** Riallinea i dati di R.O.U.T.E. esposti nella HUD (Bridge, Header) con lo store reale. */
+function refreshRouteMirrors() {
+  systemState.activeShifts = listUpcomingLegacy();
+  // Il piano di studi vive nello store: la HUD legge da lì, non da valori fissi.
+  systemState.examsCountdown = listUpcomingExams(6);
+}
+
+refreshRouteMirrors();
 
 // ==========================================
 // 1. N.I.C.O. Master Orchestrator API
@@ -84,7 +115,9 @@ app.post('/api/nico/route', async (req, res) => {
     const ai = getAiClient();
     if (!ai) {
       // Fallback deterministic router if no API key
-      return res.json(simulateNicoRouting(message));
+      const fallback = simulateNicoRouting(message);
+      refreshRouteMirrors();
+      return res.json(fallback);
     }
 
     const nicoSystemInstruction = `Sei N.I.C.O. (Neural Interactive Co-Operator), l'Orchestratore Centrale e Semantic Router della NAVICELLA V1.0.
@@ -95,6 +128,7 @@ Analizza l'input dell'utente (che proviene da Telegram) e classifica l'intento v
    Funzione: ledger_add_expense(amount: number, currency: string, category: string, item: string, method: string)
 2. R.O.U.T.E. (Time Management & Turni): Inserimento turni di lavoro, timeboxing, countdown esami, orari.
    Funzione: route_insert_shift(day_or_date: string, start_time: string, end_time: string, label: string)
+   Funzione esami: route_insert_exam(subject: string, exam_date: string, start_time?: string, status?: string, priority?: string, cfu?: number, topics?: string)
 3. D.N.A. (Stiva Sovrana & RAG / Vault Obsidian): Salvataggio note, richieste di ricerca semantica nel Vault, appunti di studio.
    Funzione: dna_create_stub(title: string, tags: string[], initial_content: string, category: string)
    o dna_search_rag(query: string, domain: string)
@@ -127,16 +161,47 @@ Rispondi sempre in italiano, con tono chiaro, autorevole, esecutivo e profession
       },
       {
         name: 'route_insert_shift',
-        description: 'Pianifica un turno di lavoro o blocco orario su R.O.U.T.E. e Calendar',
+        description:
+          'Pianifica un turno di lavoro, una lezione o un impegno personale su R.O.U.T.E. (agenda persistente + timeboxing)',
         parameters: {
           type: Type.OBJECT,
           properties: {
-            day_or_date: { type: Type.STRING, description: 'Giorno o data (es. Domani, 2026-11-03)' },
+            day_or_date: { type: Type.STRING, description: 'Giorno o data (es. Domani, Lunedì, 2026-11-12)' },
             start_time: { type: Type.STRING, description: 'Ora di inizio (formato HH:MM)' },
             end_time: { type: Type.STRING, description: 'Ora di fine (formato HH:MM)' },
-            label: { type: Type.STRING, description: 'Tipologia turno o impegno' },
+            label: { type: Type.STRING, description: 'Titolo dell impegno (es. Turno Farmacia, Lezione CTF)' },
+            category: {
+              type: Type.STRING,
+              description: 'Categoria: lavoro | universita | studio | personale | altro',
+            },
+            location: { type: Type.STRING, description: 'Luogo o sede (opzionale)' },
+            recurrence: {
+              type: Type.STRING,
+              description: 'none (una tantum) oppure weekly (ogni settimana nello stesso giorno)',
+            },
           },
           required: ['start_time', 'end_time'],
+        },
+      },
+      {
+        name: 'route_insert_exam',
+        description:
+          'Registra un esame da dare nel piano di studi R.O.U.T.E. (countdown, stato, priorità, CFU, argomenti)',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            subject: { type: Type.STRING, description: 'Materia o insegnamento (es. Chimica Organica)' },
+            exam_date: { type: Type.STRING, description: 'Data dell appello (es. Domani, 5 dicembre, 2026-12-05)' },
+            start_time: { type: Type.STRING, description: 'Ora dell appello in formato HH:MM (opzionale)' },
+            status: {
+              type: Type.STRING,
+              description: 'Stato: da_fare | prenotato | superato | ritirato',
+            },
+            priority: { type: Type.STRING, description: 'Priorità di preparazione: alta | media | bassa' },
+            cfu: { type: Type.NUMBER, description: 'CFU dell insegnamento (opzionale)' },
+            topics: { type: Type.STRING, description: 'Argomenti da preparare (opzionale)' },
+          },
+          required: ['subject', 'exam_date'],
         },
       },
       {
@@ -252,17 +317,84 @@ Rispondi sempre in italiano, con tono chiaro, autorevole, esecutivo e profession
             }`;
           }
         } else if (name === 'route_insert_shift') {
-          const newShift = {
-            id: `sh-${Date.now()}`,
-            day: String(args.day_or_date || 'Prossimo turno'),
-            date: new Date().toISOString().split('T')[0],
-            start: String(args.start_time || '09:00'),
-            end: String(args.end_time || '17:00'),
-            role: String(args.label || 'Turno di lavoro'),
-          };
-          systemState.activeShifts.unshift(newShift);
-          if (!finalTelegramReply) {
-            finalTelegramReply = `🗓️ Turno registrato su R.O.U.T.E. [${newShift.day} ${newShift.start}-${newShift.end}]. Ricalcolo blocchi liberi per studio CTF completato. Prossimo esame tra ${systemState.examsCountdown[0].daysLeft} giorni.`;
+          const label = String(args.label || 'Impegno');
+          const dateISO = resolveDateHint(String(args.day_or_date || ''));
+          const category = coerceCategory(args.category, label);
+
+          const result = createShift(
+            {
+              title: label,
+              category,
+              date: dateISO,
+              start: String(args.start_time || '09:00'),
+              end: String(args.end_time || '17:00'),
+              location: args.location ? String(args.location) : undefined,
+              recurrence: args.recurrence === 'weekly' ? 'weekly' : 'none',
+            },
+            'nico',
+          );
+
+          if (result.errors.length > 0) {
+            finalTelegramReply = `⚠️ R.O.U.T.E.: impegno non registrato (${result.errors.join(' ')})`;
+            executionLogs[executionLogs.length - 1].status = 'ERROR';
+          } else if (result.shift) {
+            const shift = result.shift;
+            const weekday = WEEKDAY_NAMES[parseISODate(shift.date).getDay()];
+            const dayAgenda = buildAgenda(shift.date, shift.date, { bufferMinutes: 30 });
+            const freeHours = Math.round((dayAgenda.totals.freeMinutes / 60) * 10) / 10;
+            const conflictsNote =
+              result.conflicts.length > 0
+                ? `\n⚠️ Attenzione: si sovrappone a ${result.conflicts
+                    .map((c) => `${c.title} (${c.start}-${c.end})`)
+                    .join(', ')}.`
+                : '';
+
+            finalTelegramReply =
+              `🗓️ ${shift.title} registrato su R.O.U.T.E.: ${weekday} ${shift.date}, ${shift.start}-${shift.end}` +
+              `${shift.location ? ` · ${shift.location}` : ''} [${shift.category}${shift.recurrence === 'weekly' ? ' · settimanale' : ''}].\n` +
+              `⏱️ Tempo libero residuo in giornata: ${freeHours}h utili per lo studio CTF.` +
+              conflictsNote;
+          } else {
+            finalTelegramReply = `🗓️ Turno elaborato da R.O.U.T.E.`;
+          }
+        } else if (name === 'route_insert_exam') {
+          const subject = String(args.subject || 'Esame');
+          const dateISO = resolveDateHint(String(args.exam_date || ''));
+          const timeMatch = /^(\d{1,2}):(\d{2})$/.exec(String(args.start_time || '').trim());
+          const examStatus = ['da_fare', 'prenotato', 'superato', 'ritirato'].includes(String(args.status))
+            ? (String(args.status) as 'da_fare' | 'prenotato' | 'superato' | 'ritirato')
+            : 'da_fare';
+          const examPriority = ['alta', 'media', 'bassa'].includes(String(args.priority))
+            ? (String(args.priority) as 'alta' | 'media' | 'bassa')
+            : 'media';
+
+          const result = createExam(
+            {
+              subject,
+              date: dateISO,
+              time: timeMatch ? `${String(Number(timeMatch[1])).padStart(2, '0')}:${timeMatch[2]}` : null,
+              status: examStatus,
+              priority: examPriority,
+              cfu: Number.isFinite(Number(args.cfu)) && Number(args.cfu) > 0 ? Number(args.cfu) : null,
+              topics: args.topics ? String(args.topics) : undefined,
+            },
+            'nico',
+          );
+
+          if (result.errors.length > 0 || !result.exam) {
+            finalTelegramReply = `⚠️ R.O.U.T.E.: esame non registrato (${result.errors.join(' ')})`;
+            executionLogs[executionLogs.length - 1].status = 'ERROR';
+          } else {
+            const exam = result.exam;
+            const weekday = WEEKDAY_NAMES[parseISODate(exam.date).getDay()];
+            const upcoming = buildAgenda(exam.date, exam.date, { bufferMinutes: 0 });
+            const freeHours = Math.round((upcoming.totals.freeMinutes / 60) * 10) / 10;
+
+            finalTelegramReply =
+              `🎓 ${exam.subject} aggiunto al piano di studi R.O.U.T.E.: ${weekday} ${exam.date}` +
+              `${exam.time ? ` ore ${exam.time}` : ''} · stato ${exam.status}, priorità ${exam.priority}` +
+              `${exam.cfu ? ` · ${exam.cfu} CFU` : ''}.\n` +
+              `📚 Tempo libero residuo quel giorno: ${freeHours}h da dedicare alla preparazione.`;
           }
         } else if (name === 'faraday_update_battery') {
           const delta = Number(args.battery_delta) || -10;
@@ -299,6 +431,8 @@ Rispondi sempre in italiano, con tono chiaro, autorevole, esecutivo e profession
       finalTelegramReply = `🛰️ N.I.C.O. Router: Richiesta analizzata ed instradata ai microservizi di bordo della Navicella.`;
     }
 
+    refreshRouteMirrors();
+
     res.json({
       success: true,
       rawUserMessage: message,
@@ -325,6 +459,38 @@ function getCompartmentByFunction(fnName: string): string {
   return 'N.I.C.O. Core';
 }
 
+/** Converte un'indicazione libera ("domani", "lunedì", "2026-11-12") in data ISO. */
+function resolveDateHint(hint: string, fallback: Date = new Date()): string {
+  const raw = String(hint || '').trim();
+  if (!raw) return toISODate(fallback);
+
+  const probe = parseShifts(`${raw} 09-10`, fallback);
+  if (probe.shifts[0]) return probe.shifts[0].date;
+
+  return toISODate(fallback);
+}
+
+const ROUTE_CATEGORIES: ShiftCategory[] = ['lavoro', 'universita', 'studio', 'personale', 'altro'];
+
+/** Normalizza la categoria proposta dal modello, con fallback euristico sul titolo. */
+function coerceCategory(value: unknown, label: string): ShiftCategory {
+  const normalized = String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (ROUTE_CATEGORIES.includes(normalized as ShiftCategory)) return normalized as ShiftCategory;
+
+  const probe = parseShifts(`${label || ''} 09-10`);
+  return probe.shifts[0]?.category ?? 'altro';
+}
+
+/** Riepilogo testuale di un impegno, condiviso da fallback e integrazione R.O.U.T.E. */
+function describeShift(shift: { title: string; date: string; start: string; end: string; category: ShiftCategory }) {
+  const weekday = WEEKDAY_NAMES[parseISODate(shift.date).getDay()];
+  return `${shift.title} · ${weekday} ${shift.date} ${shift.start}-${shift.end} [${shift.category}]`;
+}
+
 function simulateNicoRouting(text: string) {
   const lower = text.toLowerCase();
   let fnName = 'general_query';
@@ -347,16 +513,58 @@ function simulateNicoRouting(text: string) {
     systemState.currentBalance -= amount;
     systemState.monthlySpend += amount;
     reply = `✅ Spesa di ${amount}€ registrata in L.E.D.G.E.R. Runway stimata: ${systemState.runwayMonths} mesi.`;
-  } else if (lower.includes('lavoro') || lower.includes('turno') || lower.includes('orario')) {
+  } else if (
+    /(lavoro|turno|turni|lezione|lezioni|esame|esami|universita|studio|studiare|palestra|allenamento|impegno|appuntamento)/.test(
+      lower,
+    )
+  ) {
+    // Nessuna API key: usa il parser deterministico di R.O.U.T.E. invece di orari hardcoded
     fnName = 'route_insert_shift';
-    compartment = 'C-05: R.O.U.T.E. (Logistica)';
-    args = {
-      day_or_date: lower.includes('domani') ? 'Domani' : 'Pianificato',
-      start_time: '14:00',
-      end_time: '18:00',
-      label: 'Turno di lavoro',
-    };
-    reply = `🗓️ Turno registrato su R.O.U.T.E. (14:00 - 18:00). Timeboxing ricalcolato per lo studio.`;
+    compartment = 'C-05: R.O.U.T.E. (Logistica & Turni)';
+
+    const parsed = parseShifts(text);
+    const created: string[] = [];
+    const routeConflicts: string[] = [];
+    const routeErrors: string[] = [...parsed.errors];
+
+    for (const shift of parsed.shifts) {
+      const result = createShift(
+        {
+          title: shift.title,
+          category: shift.category,
+          date: shift.date,
+          start: shift.start,
+          end: shift.end,
+          location: shift.location,
+          recurrence: shift.recurrence,
+        },
+        'nl',
+      );
+      routeErrors.push(...result.errors);
+      routeConflicts.push(
+        ...result.conflicts.map((conflict) => `${conflict.title} (${conflict.start}-${conflict.end})`),
+      );
+      if (result.shift) created.push(describeShift(result.shift));
+    }
+
+    args = parsed.shifts[0]
+      ? {
+          day_or_date: parsed.shifts[0].date,
+          start_time: parsed.shifts[0].start,
+          end_time: parsed.shifts[0].end,
+          label: parsed.shifts[0].title,
+          category: parsed.shifts[0].category,
+        }
+      : {};
+
+    reply =
+      created.length > 0
+        ? `🗓️ R.O.U.T.E.: ${created.length} impegno${created.length === 1 ? '' : 'i'} registrat${
+            created.length === 1 ? 'o' : 'i'
+          }.\n${created
+            .map((entry) => `• ${entry}`)
+            .join('\n')}${routeConflicts.length > 0 ? `\n⚠️ Sovrapposizioni: ${routeConflicts.join(', ')}.` : ''}`
+        : `⚠️ R.O.U.T.E.: ${routeErrors[0] || 'nessun impegno riconosciuto.'}`;
   } else if (lower.includes('stanco') || lower.includes('esausto') || lower.includes('batteria') || lower.includes('dormir')) {
     fnName = 'faraday_update_battery';
     compartment = 'C-06: F.A.R.A.D.A.Y.';
@@ -668,12 +876,261 @@ app.post('/api/security/whitelist', (req, res) => {
 
 // System State Getter
 app.get('/api/system/state', (req, res) => {
+  refreshRouteMirrors();
   res.json({
     ...systemState,
+    routeStore: storeMeta(),
     hasApiKey: Boolean(process.env.GEMINI_API_KEY),
     timestamp: new Date().toISOString(),
   });
 });
+
+// ==========================================
+// 7. C-05: R.O.U.T.E. — Turni, agenda e timeboxing
+// ==========================================
+
+function routePayload() {
+  return { shifts: listShifts(), exams: listExams(), meta: storeMeta() };
+}
+
+/** Payload dedicato al piano di studi. */
+function examPayload() {
+  return { exams: listExams(), meta: storeMeta() };
+}
+
+/** Intervallo di default: settimana corrente (lunedì → domenica). */
+function defaultRange() {
+  const start = startOfWeek(new Date());
+  return { from: toISODate(start), to: toISODate(addDays(start, 6)) };
+}
+
+// Elenco completo degli impegni memorizzati
+app.get('/api/route/shifts', (req, res) => {
+  res.json(routePayload());
+});
+
+// Creazione impegno (turno di lavoro, lezione, esame, studio, personale)
+app.post('/api/route/shifts', (req, res) => {
+  const body = (req.body || {}) as ShiftInput;
+  const source = req.body?.source === 'nl' ? 'nl' : 'manual';
+  const result = createShift(body, source);
+
+  if (result.errors.length > 0 && !result.shift) {
+    return res.status(400).json({ ...routePayload(), errors: result.errors });
+  }
+
+  res.status(201).json({
+    ...routePayload(),
+    shift: result.shift,
+    conflicts: result.conflicts,
+    errors: result.errors,
+  });
+});
+
+// Modifica impegno (l'id può essere anche un'occorrenza ricorrente: base@YYYY-MM-DD)
+app.patch('/api/route/shifts/:id', (req, res) => {
+  const result = updateShift(req.params.id, req.body || {});
+  if (result.errors.length > 0 && !result.shift) {
+    return res.status(400).json({ ...routePayload(), errors: result.errors });
+  }
+  res.json({ ...routePayload(), shift: result.shift, conflicts: result.conflicts, errors: result.errors });
+});
+
+// Eliminazione impegno (o dell'intera serie settimanale)
+app.delete('/api/route/shifts/:id', (req, res) => {
+  const result = deleteShift(req.params.id);
+  if (result.errors.length > 0) {
+    return res.status(404).json({ ...routePayload(), errors: result.errors });
+  }
+  res.json(routePayload());
+});
+
+// ============================ Piano di studi: esami =========================
+// Gli esami sono entità autonome: materia, data appello, ora opzionale,
+// stato, priorità, CFU, voto e argomenti da preparare.
+
+// Elenco del piano di studi
+app.get('/api/route/exams', (_req, res) => {
+  res.json(examPayload());
+});
+
+// Creazione esame
+app.post('/api/route/exams', (req, res) => {
+  const source = req.body?.source === 'nl' ? 'nl' : req.body?.source === 'nico' ? 'nico' : 'manual';
+  const result = createExam((req.body || {}) as ExamInput, source);
+
+  if (result.errors.length > 0 && !result.exam) {
+    return res.status(400).json({ ...examPayload(), errors: result.errors });
+  }
+
+  res.status(201).json({ ...examPayload(), exam: result.exam, errors: result.errors });
+});
+
+// Modifica esame (es. passaggio a "prenotato", voto, nuova data)
+app.patch('/api/route/exams/:id', (req, res) => {
+  const result = updateExam(req.params.id, (req.body || {}) as ExamInput);
+  if (result.errors.length > 0 && !result.exam) {
+    return res.status(400).json({ ...examPayload(), errors: result.errors });
+  }
+  res.json({ ...examPayload(), exam: result.exam, errors: result.errors });
+});
+
+// Eliminazione esame
+app.delete('/api/route/exams/:id', (req, res) => {
+  const result = deleteExam(req.params.id);
+  if (result.errors.length > 0) {
+    return res.status(404).json({ ...examPayload(), errors: result.errors });
+  }
+  res.json(examPayload());
+});
+
+// Parsing in linguaggio naturale degli esami (anteprima, nessun salvataggio)
+app.post('/api/route/exams/parse', (req, res) => {
+  const text = String(req.body?.text || '');
+  res.json(parseExams(text));
+});
+
+// Ingestione diretta degli esami (parse + salvataggio)
+app.post('/api/route/exams/ingest', (req, res) => {
+  const text = String(req.body?.text || '');
+  const outcome = parseExams(text);
+  const source = req.body?.source === 'manual' ? 'manual' : 'nl';
+
+  const created: any[] = [];
+  const errors: string[] = [...outcome.errors];
+
+  for (const exam of outcome.exams) {
+    const result = createExam(
+      {
+        subject: exam.subject,
+        date: exam.date,
+        time: exam.time ?? null,
+        status: exam.status,
+        priority: exam.priority,
+        cfu: exam.cfu ?? null,
+        grade: exam.grade ?? null,
+        topics: exam.topics,
+        notes: exam.notes,
+      },
+      source,
+    );
+    errors.push(...result.errors);
+    if (result.exam) created.push(result.exam);
+  }
+
+  if (created.length === 0) {
+    return res.status(422).json({ ...examPayload(), created, errors, raw: text });
+  }
+
+  res.status(201).json({ ...examPayload(), created, errors, raw: text });
+});
+
+// Parsing in linguaggio naturale: non salva nulla, restituisce l'anteprima.
+// Gli esami hanno un parser dedicato: un segmento "esame di X il 5 dicembre"
+// non deve diventare un turno con orario inventato.
+app.post('/api/route/parse', (req, res) => {
+  const text = String(req.body?.text || '');
+  const outcome = parseShifts(text, new Date(), { skipExamSegments: true });
+  const examOutcome = parseExams(text);
+
+  const preview = outcome.shifts.map((shift) => ({
+    ...shift,
+    conflicts: findConflicts({
+      date: shift.date,
+      start: shift.start,
+      end: shift.end,
+      recurrence: shift.recurrence,
+    }),
+  }));
+
+  res.json({
+    ...outcome,
+    preview,
+    exams: examOutcome.exams,
+    examErrors: examOutcome.errors,
+  });
+});
+
+// Ingestione diretta: parse + salvataggio (usata da Telegram/E.R.M.E.S.)
+app.post('/api/route/ingest', (req, res) => {
+  const text = String(req.body?.text || '');
+  const outcome = parseShifts(text, new Date(), { skipExamSegments: true });
+  const examOutcome = parseExams(text);
+  const source = req.body?.source === 'manual' ? 'manual' : 'nl';
+
+  const created: any[] = [];
+  const createdExams: any[] = [];
+  const conflicts: any[] = [];
+  const errors: string[] = [...outcome.errors, ...examOutcome.errors];
+
+  for (const shift of outcome.shifts) {
+    const result = createShift(
+      {
+        title: shift.title,
+        category: shift.category,
+        date: shift.date,
+        start: shift.start,
+        end: shift.end,
+        location: shift.location,
+        recurrence: shift.recurrence,
+      },
+      source,
+    );
+    errors.push(...result.errors);
+    conflicts.push(...result.conflicts);
+    if (result.shift) created.push(result.shift);
+  }
+
+  for (const exam of examOutcome.exams) {
+    const result = createExam(
+      {
+        subject: exam.subject,
+        date: exam.date,
+        time: exam.time ?? null,
+        status: exam.status,
+        priority: exam.priority,
+        cfu: exam.cfu ?? null,
+        grade: exam.grade ?? null,
+        topics: exam.topics,
+        notes: exam.notes,
+      },
+      source,
+    );
+    errors.push(...result.errors);
+    if (result.exam) createdExams.push(result.exam);
+  }
+
+  if (created.length === 0 && createdExams.length === 0) {
+    return res.status(422).json({ ...routePayload(), created, createdExams, conflicts, errors, raw: text });
+  }
+
+  res.status(201).json({ ...routePayload(), created, createdExams, conflicts, errors, raw: text });
+});
+
+// Agenda calcolata: impegni + blocchi liberi + totali per categoria
+app.get('/api/route/agenda', (req, res) => {
+  const fallback = defaultRange();
+  const from = String(req.query.from || fallback.from);
+  const to = String(req.query.to || fallback.to);
+  const bufferMinutes = req.query.buffer !== undefined ? Number(req.query.buffer) : 30;
+  const dayStart = req.query.dayStart ? String(req.query.dayStart) : '08:00';
+  const dayEnd = req.query.dayEnd ? String(req.query.dayEnd) : '23:00';
+  const examBlockMinutes = req.query.examBlock !== undefined ? Number(req.query.examBlock) : 120;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return res.status(400).json({ error: 'Parametri from/to non validi: atteso YYYY-MM-DD.' });
+  }
+  if (to < from) {
+    return res.status(400).json({ error: 'La data di fine precede quella di inizio.' });
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(dayStart) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(dayEnd)) {
+    return res.status(400).json({ error: 'dayStart/dayEnd non validi: atteso HH:MM.' });
+  }
+
+  const agenda = buildAgenda(from, to, { bufferMinutes, dayStart, dayEnd, examBlockMinutes });
+  res.json({ ...agenda, meta: storeMeta() });
+});
+
 
 // ==========================================
 // Dev & Production Vite Middleware mounting

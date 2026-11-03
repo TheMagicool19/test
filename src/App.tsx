@@ -53,7 +53,11 @@ const INITIAL_LOGS: RoutingLogItem[] = [
 ];
 
 export default function App() {
-  const [activeModule, setActiveModule] = useState<CompartmentId>('bridge');
+  const [activeModule, setActiveModule] = useState<CompartmentId>(() =>
+    new URLSearchParams(window.location.search).get('module') === 'nico-ermes'
+      ? 'nico-ermes'
+      : 'bridge'
+  );
   const [telemetry, setTelemetry] = useState<SystemTelemetry | null>(null);
   const [logs, setLogs] = useState<RoutingLogItem[]>(INITIAL_LOGS);
   const [whitelistConfig, setWhitelistConfig] = useState<{
@@ -158,8 +162,8 @@ export default function App() {
   };
 
   // Helper for adding shifts from R.O.U.T.E.
-  const handleAddShiftDirect = async (nlText: string) => {
-    return handleExecutePrompt(nlText, 'TELEGRAM_TEXT');
+  const handleRouteChanged = async () => {
+    await loadInitialData();
   };
 
   // Module titles for the Header
@@ -225,11 +229,7 @@ export default function App() {
           {activeModule === 'forge' && <ForgeModule telemetry={telemetry} />}
 
           {activeModule === 'route' && (
-            <RouteModule
-              shifts={telemetry?.activeShifts || []}
-              exams={telemetry?.examsCountdown || []}
-              onAddShift={handleAddShiftDirect}
-            />
+            <RouteModule onChanged={handleRouteChanged} />
           )}
 
           {activeModule === 'faraday' && (

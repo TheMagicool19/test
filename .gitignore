@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Store locale di R.O.U.T.E. (agenda personale)
+data/
