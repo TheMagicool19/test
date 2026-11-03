@@ -63,12 +63,72 @@ export interface ExamRecord {
   cfu?: number | null;
   /** Voto conseguito (18–31, dove 31 = 30L) */
   grade?: number | null;
+  /** Ore di studio che si vogliono dedicare alla preparazione */
+  targetHours?: number | null;
   /** Argomenti da preparare */
   topics?: string;
   notes?: string;
+  /** Id dell'evento su Google Calendar, se sincronizzato */
+  googleEventId?: string | null;
   source: 'nl' | 'manual' | 'nico';
   createdAt: string;
   updatedAt: string;
+}
+
+/** Avanzamento della preparazione di un esame. */
+export interface ExamStudyStats {
+  examId: string;
+  targetMinutes: number | null;
+  plannedMinutes: number;
+  remainingMinutes: number | null;
+  progressPct: number | null;
+  daysLeft: number;
+  riskLevel: 'done' | 'ok' | 'attention' | 'critical';
+}
+
+export interface RouteWarning {
+  id: string;
+  severity: 'info' | 'warning' | 'critical';
+  code: 'exam-imminent' | 'exam-no-plan' | 'exam-past' | 'week-overload';
+  message: string;
+  date?: string;
+  examId?: string;
+}
+
+export interface OverviewDay {
+  date: string;
+  weekdayShort: string;
+  shiftMinutes: number;
+  studyMinutes: number;
+  examCount: number;
+  freeMinutes: number;
+}
+
+export interface RouteOverview {
+  from: string;
+  to: string;
+  days: OverviewDay[];
+  exams: (ExamRecord & { daysLeft: number; stats: ExamStudyStats })[];
+  warnings: RouteWarning[];
+  totals: {
+    shiftMinutes: number;
+    studyMinutes: number;
+    examCount: number;
+    freeMinutes: number;
+  };
+  generatedAt: string;
+  meta: RouteStoreMeta;
+}
+
+export interface GoogleCalendarStatus {
+  configured: boolean;
+  dryRun: boolean;
+  calendarId: string | null;
+  timeZone: string;
+  lastError: string | null;
+  lastSuccessAt: string | null;
+  lastAction: string | null;
+  pending: number;
 }
 
 /** Bozza di esame non ancora salvata (parser NL o form manuale). */
@@ -93,6 +153,7 @@ export interface ExamPayload {
   priority?: ExamPriority;
   cfu?: number | null;
   grade?: number | null;
+  targetHours?: number | null;
   topics?: string;
   notes?: string;
 }
@@ -131,8 +192,12 @@ export interface ShiftRecord {
   end: string;
   location?: string;
   notes?: string;
+  /** Esame collegato (studio mirato alla preparazione) */
+  examId?: string | null;
   recurrence: ShiftRecurrence;
   recurrenceUntil?: string | null;
+  /** Id dell'evento su Google Calendar, se sincronizzato */
+  googleEventId?: string | null;
   source: 'nl' | 'manual' | 'nico';
   createdAt: string;
   updatedAt: string;
@@ -151,6 +216,8 @@ export interface ShiftConflict {
   start: string;
   end: string;
   category: ShiftCategory;
+  /** Impegno o appello d'esame */
+  kind?: 'shift' | 'exam';
 }
 
 export interface ParsedShift {
@@ -242,6 +309,7 @@ export interface ShiftPayload {
   end: string;
   location?: string;
   notes?: string;
+  examId?: string | null;
   recurrence?: ShiftRecurrence;
   recurrenceUntil?: string | null;
 }

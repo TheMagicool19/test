@@ -14,11 +14,15 @@ import {
 } from './server/routeParser.ts';
 import {
   buildAgenda,
+  buildOverview,
+  buildRouteWarnings,
   createExam,
   createShift,
   deleteExam,
   deleteShift,
   findConflicts,
+  getExam,
+  getShift,
   listExams,
   listShifts,
   listUpcomingExams,
@@ -29,7 +33,16 @@ import {
   type ExamInput,
   type ShiftInput,
   type ShiftCategory,
+  attachGoogleEvent,
 } from './server/routeEngine.ts';
+import {
+  calendarStatus,
+  isGoogleConfigured,
+  pingCalendar,
+  removeCalendarEvent,
+  syncExamEvent,
+  syncShiftEvent,
+} from './server/googleCalendar.ts';
 
 dotenv.config();
 
@@ -101,6 +114,36 @@ function refreshRouteMirrors() {
 }
 
 refreshRouteMirrors();
+
+// ==========================================
+// R.O.U.T.E. ⇄ Google Calendar
+// ==========================================
+
+/** Spinge un impegno sul calendario e memorizza l'id dell'evento remoto. */
+async function pushShiftToCalendar(id: string): Promise<void> {
+  const shift = getShift(id);
+  if (!shift) return;
+  const eventId = await syncShiftEvent(shift);
+  if (eventId) attachGoogleEvent('shift', shift.id, eventId);
+}
+
+async function pushExamToCalendar(id: string): Promise<void> {
+  const exam = getExam(id);
+  if (!exam) return;
+  const eventId = await syncExamEvent(exam);
+  if (eventId) attachGoogleEvent('exam', exam.id, eventId);
+}
+
+/** Fire-and-forget: un guasto Google non deve mai rompere l'agenda locale. */
+function syncShiftInBackground(id: string): void {
+  if (!isGoogleConfigured()) return;
+  void pushShiftToCalendar(id).catch((error) => console.error('[R.O.U.T.E.] sync impegno:', error));
+}
+
+function syncExamInBackground(id: string): void {
+  if (!isGoogleConfigured()) return;
+  void pushExamToCalendar(id).catch((error) => console.error('[R.O.U.T.E.] sync esame:', error));
+}
 
 // ==========================================
 // 1. N.I.C.O. Master Orchestrator API
@@ -339,6 +382,7 @@ Rispondi sempre in italiano, con tono chiaro, autorevole, esecutivo e profession
             executionLogs[executionLogs.length - 1].status = 'ERROR';
           } else if (result.shift) {
             const shift = result.shift;
+            syncShiftInBackground(shift.id);
             const weekday = WEEKDAY_NAMES[parseISODate(shift.date).getDay()];
             const dayAgenda = buildAgenda(shift.date, shift.date, { bufferMinutes: 30 });
             const freeHours = Math.round((dayAgenda.totals.freeMinutes / 60) * 10) / 10;
@@ -386,6 +430,7 @@ Rispondi sempre in italiano, con tono chiaro, autorevole, esecutivo e profession
             executionLogs[executionLogs.length - 1].status = 'ERROR';
           } else {
             const exam = result.exam;
+            syncExamInBackground(exam.id);
             const weekday = WEEKDAY_NAMES[parseISODate(exam.date).getDay()];
             const upcoming = buildAgenda(exam.date, exam.date, { bufferMinutes: 0 });
             const freeHours = Math.round((upcoming.totals.freeMinutes / 60) * 10) / 10;
@@ -919,6 +964,8 @@ app.post('/api/route/shifts', (req, res) => {
     return res.status(400).json({ ...routePayload(), errors: result.errors });
   }
 
+  if (result.shift) syncShiftInBackground(result.shift.id);
+
   res.status(201).json({
     ...routePayload(),
     shift: result.shift,
@@ -933,15 +980,18 @@ app.patch('/api/route/shifts/:id', (req, res) => {
   if (result.errors.length > 0 && !result.shift) {
     return res.status(400).json({ ...routePayload(), errors: result.errors });
   }
+  if (result.shift) syncShiftInBackground(result.shift.id);
   res.json({ ...routePayload(), shift: result.shift, conflicts: result.conflicts, errors: result.errors });
 });
 
 // Eliminazione impegno (o dell'intera serie settimanale)
 app.delete('/api/route/shifts/:id', (req, res) => {
+  const existing = getShift(req.params.id);
   const result = deleteShift(req.params.id);
   if (result.errors.length > 0) {
     return res.status(404).json({ ...routePayload(), errors: result.errors });
   }
+  if (existing?.googleEventId) void removeCalendarEvent(existing.googleEventId);
   res.json(routePayload());
 });
 
@@ -963,6 +1013,8 @@ app.post('/api/route/exams', (req, res) => {
     return res.status(400).json({ ...examPayload(), errors: result.errors });
   }
 
+  if (result.exam) syncExamInBackground(result.exam.id);
+
   res.status(201).json({ ...examPayload(), exam: result.exam, errors: result.errors });
 });
 
@@ -972,15 +1024,18 @@ app.patch('/api/route/exams/:id', (req, res) => {
   if (result.errors.length > 0 && !result.exam) {
     return res.status(400).json({ ...examPayload(), errors: result.errors });
   }
+  if (result.exam) syncExamInBackground(result.exam.id);
   res.json({ ...examPayload(), exam: result.exam, errors: result.errors });
 });
 
 // Eliminazione esame
 app.delete('/api/route/exams/:id', (req, res) => {
+  const existing = getExam(req.params.id);
   const result = deleteExam(req.params.id);
   if (result.errors.length > 0) {
     return res.status(404).json({ ...examPayload(), errors: result.errors });
   }
+  if (existing?.googleEventId) void removeCalendarEvent(existing.googleEventId);
   res.json(examPayload());
 });
 
@@ -1015,7 +1070,10 @@ app.post('/api/route/exams/ingest', (req, res) => {
       source,
     );
     errors.push(...result.errors);
-    if (result.exam) created.push(result.exam);
+    if (result.exam) {
+      created.push(result.exam);
+      syncExamInBackground(result.exam.id);
+    }
   }
 
   if (created.length === 0) {
@@ -1078,7 +1136,10 @@ app.post('/api/route/ingest', (req, res) => {
     );
     errors.push(...result.errors);
     conflicts.push(...result.conflicts);
-    if (result.shift) created.push(result.shift);
+    if (result.shift) {
+      created.push(result.shift);
+      syncShiftInBackground(result.shift.id);
+    }
   }
 
   for (const exam of examOutcome.exams) {
@@ -1097,7 +1158,10 @@ app.post('/api/route/ingest', (req, res) => {
       source,
     );
     errors.push(...result.errors);
-    if (result.exam) createdExams.push(result.exam);
+    if (result.exam) {
+      createdExams.push(result.exam);
+      syncExamInBackground(result.exam.id);
+    }
   }
 
   if (created.length === 0 && createdExams.length === 0) {
@@ -1129,6 +1193,82 @@ app.get('/api/route/agenda', (req, res) => {
 
   const agenda = buildAgenda(from, to, { bufferMinutes, dayStart, dayEnd, examBlockMinutes });
   res.json({ ...agenda, meta: storeMeta() });
+});
+
+// Vista sintetica: prossimi N giorni, esami con avanzamento, segnalazioni
+app.get('/api/route/overview', (req, res) => {
+  const days = req.query.days !== undefined ? Number(req.query.days) : 60;
+  res.json({ ...buildOverview(days), meta: storeMeta() });
+});
+
+// Segnalazioni isolate (badge, notifiche, automazioni)
+app.get('/api/route/warnings', (_req, res) => {
+  const warnings = buildRouteWarnings();
+  res.json({
+    warnings,
+    critical: warnings.filter((warning) => warning.severity === 'critical').length,
+    warning: warnings.filter((entry) => entry.severity === 'warning').length,
+  });
+});
+
+// ==========================================
+// 8. R.O.U.T.E. ⇄ Google Calendar
+// ==========================================
+
+app.get('/api/google/status', (_req, res) => {
+  const pending =
+    listShifts().filter((shift) => !shift.googleEventId).length +
+    listExams().filter((exam) => !exam.googleEventId).length;
+
+  res.json({ ...calendarStatus(), pending });
+});
+
+// Verifica credenziali (chiamata leggera a Google)
+app.post('/api/google/ping', async (_req, res) => {
+  const result = await pingCalendar();
+  res.status(result.ok ? 200 : 400).json({ ...result, ...calendarStatus() });
+});
+
+// Sincronizzazione esplicita: impegni futuri (o ricorrenti) + tutti gli esami
+app.post('/api/google/sync', async (_req, res) => {
+  if (!isGoogleConfigured()) {
+    return res.status(400).json({
+      error:
+        'Google Calendar non configurato: imposta GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e GOOGLE_REFRESH_TOKEN nel file .env.',
+      ...calendarStatus(),
+    });
+  }
+
+  const today = toISODate(new Date());
+  const shifts = listShifts().filter((shift) => shift.date >= today || shift.recurrence === 'weekly');
+  const exams = listExams();
+
+  let shiftSynced = 0;
+  let examSynced = 0;
+
+  for (const shift of shifts) {
+    const eventId = await syncShiftEvent(shift);
+    if (eventId) {
+      attachGoogleEvent('shift', shift.id, eventId);
+      shiftSynced += 1;
+    }
+  }
+
+  for (const exam of exams) {
+    const eventId = await syncExamEvent(exam);
+    if (eventId) {
+      attachGoogleEvent('exam', exam.id, eventId);
+      examSynced += 1;
+    }
+  }
+
+  res.json({
+    ...calendarStatus(),
+    shiftSynced,
+    examSynced,
+    shiftsConsidered: shifts.length,
+    examsConsidered: exams.length,
+  });
 });
 
 

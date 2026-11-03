@@ -11,6 +11,7 @@ import {
   addDays,
   minutesToTime,
   parseISODate,
+  startOfWeek,
   timeToMinutes,
   toISODate,
   WEEKDAY_NAMES,
@@ -35,9 +36,13 @@ export interface ShiftRecord {
   end: string;
   location?: string;
   notes?: string;
+  /** Esame collegato (sessione di studio dedicata alla preparazione) */
+  examId?: string | null;
   recurrence: ShiftRecurrence;
   /** Ultima data valida per la ricorrenza (opzionale) */
   recurrenceUntil?: string | null;
+  /** Id dell'evento creato su Google Calendar, se sincronizzato */
+  googleEventId?: string | null;
   source: 'nl' | 'manual' | 'nico';
   createdAt: string;
   updatedAt: string;
@@ -57,6 +62,7 @@ export interface ShiftInput {
   end?: string;
   location?: string;
   notes?: string;
+  examId?: string | null;
   recurrence?: ShiftRecurrence;
   recurrenceUntil?: string | null;
 }
@@ -68,6 +74,8 @@ export interface ShiftConflict {
   start: string;
   end: string;
   category: ShiftCategory;
+  /** L'elemento in conflitto è un impegno o un appello d'esame */
+  kind?: 'shift' | 'exam';
 }
 
 /* ------------------------------------------------------------------- Esami */
@@ -85,8 +93,12 @@ export interface ExamRecord {
   cfu?: number | null;
   /** Voto (18–31, dove 31 = 30L) */
   grade?: number | null;
+  /** Ore di studio che si vogliono dedicare alla preparazione */
+  targetHours?: number | null;
   topics?: string;
   notes?: string;
+  /** Id dell'evento creato su Google Calendar, se sincronizzato */
+  googleEventId?: string | null;
   source: 'nl' | 'manual' | 'nico';
   createdAt: string;
   updatedAt: string;
@@ -100,8 +112,57 @@ export interface ExamInput {
   priority?: ExamPriority;
   cfu?: number | null;
   grade?: number | null;
+  targetHours?: number | null;
   topics?: string;
   notes?: string;
+}
+
+/** Avanzamento della preparazione di un esame. */
+export interface ExamStudyStats {
+  examId: string;
+  /** Ore richieste (targetHours), in minuti */
+  targetMinutes: number | null;
+  /** Minuti di studio pianificati da oggi fino all'appello */
+  plannedMinutes: number;
+  /** Minuti ancora da pianificare (null se non c'è target) */
+  remainingMinutes: number | null;
+  /** Percentuale di copertura del target (null se non c'è target) */
+  progressPct: number | null;
+  daysLeft: number;
+  riskLevel: 'done' | 'ok' | 'attention' | 'critical';
+}
+
+export interface RouteWarning {
+  id: string;
+  severity: 'info' | 'warning' | 'critical';
+  code: 'exam-imminent' | 'exam-no-plan' | 'exam-past' | 'week-overload';
+  message: string;
+  date?: string;
+  examId?: string;
+}
+
+export interface OverviewDay {
+  date: string;
+  weekdayShort: string;
+  shiftMinutes: number;
+  studyMinutes: number;
+  examCount: number;
+  freeMinutes: number;
+}
+
+export interface RouteOverview {
+  from: string;
+  to: string;
+  days: OverviewDay[];
+  exams: (ExamRecord & { daysLeft: number; stats: ExamStudyStats })[];
+  warnings: RouteWarning[];
+  totals: {
+    shiftMinutes: number;
+    studyMinutes: number;
+    examCount: number;
+    freeMinutes: number;
+  };
+  generatedAt: string;
 }
 
 export interface ExamMutationResult {
@@ -176,6 +237,10 @@ const DEFAULT_TITLES: Record<ShiftCategory, string> = {
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const STORE_FILE = path.join(DATA_DIR, 'route.json');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+/** Un backup dello store ogni 10 minuti al massimo (evita centinaia di file). */
+const BACKUP_MIN_INTERVAL_MS = 10 * 60 * 1000;
+const BACKUP_KEEP = 20;
 
 interface StoreShape {
   version: number;
@@ -209,11 +274,13 @@ function sanitizeRecord(raw: any): ShiftRecord | null {
     end,
     location: raw.location ? String(raw.location).slice(0, 120) : undefined,
     notes: raw.notes ? String(raw.notes).slice(0, 600) : undefined,
+    examId: raw.examId ? String(raw.examId) : null,
     recurrence: raw.recurrence === 'weekly' ? 'weekly' : 'none',
     recurrenceUntil:
       typeof raw.recurrenceUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.recurrenceUntil)
         ? raw.recurrenceUntil
         : null,
+    googleEventId: raw.googleEventId ? String(raw.googleEventId) : null,
     source: ['nl', 'manual', 'nico'].includes(raw.source) ? raw.source : 'manual',
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString(),
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : new Date().toISOString(),
@@ -272,6 +339,10 @@ function sanitizeExamRecord(raw: any): ExamRecord | null {
     Number.isFinite(Number(raw.grade)) && Number(raw.grade) >= 18 && Number(raw.grade) <= 31
       ? Number(raw.grade)
       : null;
+  const targetHours =
+    Number.isFinite(Number(raw.targetHours)) && Number(raw.targetHours) > 0 && Number(raw.targetHours) <= 500
+      ? Number(raw.targetHours)
+      : null;
 
   return {
     id: String(raw.id || createExamId()),
@@ -282,8 +353,10 @@ function sanitizeExamRecord(raw: any): ExamRecord | null {
     priority: EXAM_PRIORITIES.includes(raw.priority) ? raw.priority : 'media',
     cfu,
     grade,
+    targetHours,
     topics: raw.topics ? String(raw.topics).slice(0, 600) : undefined,
     notes: raw.notes ? String(raw.notes).slice(0, 600) : undefined,
+    googleEventId: raw.googleEventId ? String(raw.googleEventId) : null,
     source: ['nl', 'manual', 'nico'].includes(raw.source) ? raw.source : 'manual',
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString(),
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : new Date().toISOString(),
@@ -329,11 +402,52 @@ function loadStore(): StoreShape {
   return store;
 }
 
+/**
+ * Copia di sicurezza dello store precedente, al massimo una ogni 10 minuti.
+ * Se qualcosa va storto (o due processi scrivono insieme) si può recuperare.
+ */
+function backupCurrentStore(): void {
+  try {
+    if (!fs.existsSync(STORE_FILE)) return;
+
+    let files: string[] = [];
+    if (fs.existsSync(BACKUP_DIR)) {
+      files = fs.readdirSync(BACKUP_DIR).filter((file) => file.endsWith('.json')).sort();
+    }
+
+    const newest = files[files.length - 1];
+    if (newest) {
+      const age = Date.now() - fs.statSync(path.join(BACKUP_DIR, newest)).mtimeMs;
+      if (age < BACKUP_MIN_INTERVAL_MS) return;
+    }
+
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    fs.copyFileSync(STORE_FILE, path.join(BACKUP_DIR, `route-${stamp}.json`));
+
+    const updated = fs.readdirSync(BACKUP_DIR).filter((file) => file.endsWith('.json')).sort();
+    for (const stale of updated.slice(0, Math.max(0, updated.length - BACKUP_KEEP))) {
+      fs.unlinkSync(path.join(BACKUP_DIR, stale));
+    }
+  } catch (error) {
+    console.error('[R.O.U.T.E.] Backup dello store non riuscito:', error);
+  }
+}
+
+/**
+ * Scrittura atomica: si scrive su un file temporaneo e si sostituisce con
+ * `rename` (operazione atomica sullo stesso filesystem). In questo modo un
+ * lettore concorrente non vede mai un JSON a metà.
+ */
 function persist(): void {
   if (!store) return;
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), 'utf8');
+    backupCurrentStore();
+
+    const tmp = `${STORE_FILE}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(store, null, 2), 'utf8');
+    fs.renameSync(tmp, STORE_FILE);
   } catch (error) {
     console.error('[R.O.U.T.E.] Impossibile scrivere lo store:', error);
   }
@@ -397,6 +511,20 @@ export function validateShiftInput(input: ShiftInput): { errors: string[]; value
 
   if (errors.length > 0) return { errors };
 
+  let examId: string | null = null;
+  if (input.examId) {
+    const candidate = String(input.examId).trim();
+    if (candidate) {
+      if (!loadStore().exams.some((exam) => exam.id === candidate)) {
+        errors.push('Esame collegato non trovato.');
+      } else {
+        examId = candidate;
+      }
+    }
+  }
+
+  if (errors.length > 0) return { errors };
+
   return {
     errors: [],
     value: {
@@ -407,6 +535,7 @@ export function validateShiftInput(input: ShiftInput): { errors: string[]; value
       end,
       location: input.location ? String(input.location).trim().slice(0, 120) : undefined,
       notes: input.notes ? String(input.notes).trim().slice(0, 600) : undefined,
+      examId,
       recurrence,
       recurrenceUntil,
     },
@@ -501,7 +630,7 @@ export function findConflicts(
   );
 
   const seen = new Set<string>();
-  return conflicts
+  const shiftConflicts: ShiftConflict[] = conflicts
     .filter((occurrence) => {
       const key = `${occurrence.baseId}@${occurrence.date}`;
       if (seen.has(key)) return false;
@@ -515,7 +644,33 @@ export function findConflicts(
       start: occurrence.start,
       end: occurrence.end,
       category: occurrence.category,
+      kind: 'shift' as const,
     }));
+
+  // Anche gli appelli occupano tempo: pianificare studio sopra un esame deve
+  // emergere come conflitto, non passare inosservato.
+  const examConflicts: ShiftConflict[] = loadStore()
+    .exams.filter((exam) => Boolean(exam.time) && dates.has(exam.date))
+    .map((exam) => {
+      const start = exam.time as string;
+      return {
+        exam,
+        start,
+        end: minutesToTime(Math.min(23 * 60 + 59, timeToMinutes(start) + 120)),
+      };
+    })
+    .filter(({ start, end }) => timeToMinutes(start) < endMin && startMin < timeToMinutes(end))
+    .map(({ exam, start, end }) => ({
+      id: exam.id,
+      title: exam.subject,
+      date: exam.date,
+      start,
+      end,
+      category: 'universita' as ShiftCategory,
+      kind: 'exam' as const,
+    }));
+
+  return [...shiftConflicts, ...examConflicts];
 }
 
 function mergeIntervals(intervals: { start: number; end: number }[]): { start: number; end: number }[] {
@@ -711,8 +866,10 @@ export function createShift(input: ShiftInput, source: ShiftRecord['source'] = '
     end: value.end!,
     location: value.location,
     notes: value.notes,
+    examId: value.examId ?? null,
     recurrence: (value.recurrence as ShiftRecurrence) || 'none',
     recurrenceUntil: value.recurrenceUntil ?? null,
+    googleEventId: null,
     source,
     createdAt: now,
     updatedAt: now,
@@ -739,6 +896,7 @@ export function updateShift(id: string, patch: ShiftInput): MutationResult {
     end: patch.end ?? current.end,
     location: patch.location ?? current.location,
     notes: patch.notes ?? current.notes,
+    examId: patch.examId === undefined ? current.examId ?? null : patch.examId,
     recurrence: patch.recurrence ?? current.recurrence,
     recurrenceUntil: patch.recurrenceUntil ?? current.recurrenceUntil ?? null,
   };
@@ -768,6 +926,7 @@ export function updateShift(id: string, patch: ShiftInput): MutationResult {
     end: value.end,
     location: value.location,
     notes: value.notes,
+    examId: value.examId ?? null,
     recurrence: value.recurrence,
     recurrenceUntil: value.recurrenceUntil ?? null,
     updatedAt: new Date().toISOString(),
@@ -838,6 +997,16 @@ export function validateExamInput(input: ExamInput): { errors: string[]; value?:
     }
   }
 
+  let targetHours: number | null = null;
+  if (input.targetHours !== undefined && input.targetHours !== null && String(input.targetHours).trim() !== '') {
+    const numeric = Number(input.targetHours);
+    if (!Number.isFinite(numeric) || numeric <= 0 || numeric > 500) {
+      errors.push('Ore di studio non valide: inserisci un numero tra 1 e 500.');
+    } else {
+      targetHours = numeric;
+    }
+  }
+
   if (errors.length > 0) return { errors };
 
   return {
@@ -850,6 +1019,7 @@ export function validateExamInput(input: ExamInput): { errors: string[]; value?:
       priority,
       cfu,
       grade,
+      targetHours,
       topics: input.topics ? String(input.topics).trim().slice(0, 600) : undefined,
       notes: input.notes ? String(input.notes).trim().slice(0, 600) : undefined,
     },
@@ -893,8 +1063,10 @@ export function createExam(input: ExamInput, source: ExamRecord['source'] = 'man
     priority: (value.priority as ExamPriority) ?? 'media',
     cfu: value.cfu ?? null,
     grade: value.grade ?? null,
+    targetHours: value.targetHours ?? null,
     topics: value.topics,
     notes: value.notes,
+    googleEventId: null,
     source,
     createdAt: now,
     updatedAt: now,
@@ -918,6 +1090,7 @@ export function updateExam(id: string, patch: ExamInput): ExamMutationResult {
     priority: patch.priority ?? current.priority,
     cfu: patch.cfu === undefined ? current.cfu : patch.cfu,
     grade: patch.grade === undefined ? current.grade : patch.grade,
+    targetHours: patch.targetHours === undefined ? current.targetHours : patch.targetHours,
     topics: patch.topics ?? current.topics,
     notes: patch.notes ?? current.notes,
   });
@@ -933,6 +1106,7 @@ export function updateExam(id: string, patch: ExamInput): ExamMutationResult {
     priority: value.priority,
     cfu: value.cfu ?? null,
     grade: value.grade ?? null,
+    targetHours: value.targetHours ?? null,
     topics: value.topics,
     notes: value.notes,
     updatedAt: new Date().toISOString(),
@@ -971,8 +1145,228 @@ export function listUpcomingExams(limit = 6): UpcomingExam[] {
     }));
 }
 
-/* ------------------------------------------------- Compatibilità con la HUD */
+/* ---------------------------------------------- Preparazione e segnalazioni */
 
+function daysUntil(iso: string): number {
+  const today = toISODate(new Date());
+  return Math.round((parseISODate(iso).getTime() - parseISODate(today).getTime()) / 86_400_000);
+}
+
+function formatShortDate(iso: string): string {
+  return parseISODate(iso).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+}
+
+function shiftMinutes(shift: { start: string; end: string }): number {
+  return Math.max(0, timeToMinutes(shift.end) - timeToMinutes(shift.start));
+}
+
+/** Minuti di studio pianificati (turni collegati) da oggi fino all'appello. */
+export function examStudyStats(): Record<string, ExamStudyStats> {
+  const today = toISODate(new Date());
+  const out: Record<string, ExamStudyStats> = {};
+
+  for (const exam of loadStore().exams) {
+    const daysLeft = daysUntil(exam.date);
+
+    const occurrences =
+      exam.date >= today
+        ? expandOccurrences(today, exam.date).filter((occurrence) => occurrence.examId === exam.id)
+        : [];
+
+    const plannedMinutes = occurrences.reduce((total, occurrence) => total + shiftMinutes(occurrence), 0);
+    const targetMinutes = exam.targetHours ? Math.round(exam.targetHours * 60) : null;
+    const progressPct =
+      targetMinutes && targetMinutes > 0
+        ? Math.min(100, Math.round((plannedMinutes / targetMinutes) * 100))
+        : null;
+    const remainingMinutes = targetMinutes !== null ? Math.max(0, targetMinutes - plannedMinutes) : null;
+
+    let riskLevel: ExamStudyStats['riskLevel'] = 'ok';
+    if (exam.status === 'superato' || exam.status === 'ritirato') {
+      riskLevel = 'done';
+    } else if (daysLeft < 0) {
+      riskLevel = 'critical';
+    } else if (progressPct !== null && progressPct >= 100) {
+      riskLevel = 'ok';
+    } else if (daysLeft <= 7) {
+      riskLevel = 'critical';
+    } else if (daysLeft <= 21 && (progressPct === null ? plannedMinutes === 0 : progressPct < 50)) {
+      riskLevel = 'attention';
+    } else if (daysLeft <= 30 && plannedMinutes === 0) {
+      riskLevel = 'attention';
+    }
+
+    out[exam.id] = {
+      examId: exam.id,
+      targetMinutes,
+      plannedMinutes,
+      remainingMinutes,
+      progressPct,
+      daysLeft,
+      riskLevel,
+    };
+  }
+
+  return out;
+}
+
+/** Segnalazioni deterministiche: esami a rischio, appelli passati, settimane sovraccariche. */
+export function buildRouteWarnings(): RouteWarning[] {
+  const warnings: RouteWarning[] = [];
+  const stats = examStudyStats();
+
+  for (const exam of listExams()) {
+    if (exam.status === 'superato' || exam.status === 'ritirato') continue;
+    const stat = stats[exam.id];
+    if (!stat) continue;
+
+    if (stat.daysLeft < 0) {
+      warnings.push({
+        id: `exam-past-${exam.id}`,
+        severity: 'warning',
+        code: 'exam-past',
+        date: exam.date,
+        examId: exam.id,
+        message: `«${exam.subject}»: appello del ${formatShortDate(exam.date)} passato, aggiorna lo stato.`,
+      });
+      continue;
+    }
+
+    if (stat.daysLeft <= 7) {
+      warnings.push({
+        id: `exam-imminent-${exam.id}`,
+        severity: 'warning',
+        code: 'exam-imminent',
+        date: exam.date,
+        examId: exam.id,
+        message: `«${exam.subject}» tra ${stat.daysLeft} giorn${stat.daysLeft === 1 ? 'o' : 'i'}.`,
+      });
+    }
+
+    if (stat.plannedMinutes === 0 && stat.daysLeft <= 21) {
+      warnings.push({
+        id: `exam-no-plan-${exam.id}`,
+        severity: 'critical',
+        code: 'exam-no-plan',
+        date: exam.date,
+        examId: exam.id,
+        message: `«${exam.subject}» tra ${stat.daysLeft} giorni: nessuna ora di studio pianificata.`,
+      });
+    } else if (
+      stat.progressPct !== null &&
+      stat.progressPct < 50 &&
+      stat.daysLeft <= 21 &&
+      exam.targetHours
+    ) {
+      warnings.push({
+        id: `exam-coverage-${exam.id}`,
+        severity: 'warning',
+        code: 'exam-no-plan',
+        date: exam.date,
+        examId: exam.id,
+        message: `«${exam.subject}»: coperto il ${stat.progressPct}% delle ${exam.targetHours}h pianificate.`,
+      });
+    }
+  }
+
+  const weekStart = startOfWeek(new Date());
+  for (let week = 0; week < 4; week += 1) {
+    const from = toISODate(addDays(weekStart, week * 7));
+    const to = toISODate(addDays(weekStart, week * 7 + 6));
+    const agenda = buildAgenda(from, to);
+    if (agenda.totals.busyMinutes > 40 * 60) {
+      const hours = Math.round((agenda.totals.busyMinutes / 60) * 10) / 10;
+      warnings.push({
+        id: `week-overload-${from}`,
+        severity: 'warning',
+        code: 'week-overload',
+        date: from,
+        message: `Settimana ${formatShortDate(from)}–${formatShortDate(to)}: ${hours}h impegnate, poco margine per lo studio.`,
+      });
+    }
+  }
+
+  const order: Record<RouteWarning['severity'], number> = { critical: 0, warning: 1, info: 2 };
+  return warnings.sort((a, b) => order[a.severity] - order[b.severity] || (a.date || '').localeCompare(b.date || ''));
+}
+
+/** Vista sintetica dei prossimi N giorni: giorni, esami con avanzamento, segnalazioni. */
+export function buildOverview(days = 60): RouteOverview {
+  const horizon = Math.max(1, Math.min(365, Math.round(days)));
+  const from = toISODate(new Date());
+  const to = toISODate(addDays(new Date(), horizon));
+
+  const agenda = buildAgenda(from, to);
+  const stats = examStudyStats();
+
+  const overviewDays: OverviewDay[] = agenda.days.map((day) => {
+    const total = day.shifts.reduce((sum, shift) => sum + shiftMinutes(shift), 0);
+    const study = day.shifts
+      .filter((shift) => shift.examId)
+      .reduce((sum, shift) => sum + shiftMinutes(shift), 0);
+
+    return {
+      date: day.date,
+      weekdayShort: day.weekdayShort,
+      shiftMinutes: total,
+      studyMinutes: study,
+      examCount: day.exams.length,
+      freeMinutes: day.freeMinutes,
+    };
+  });
+
+  const exams = examsInRange(from, to)
+    .map((exam) => ({
+      ...exam,
+      daysLeft: daysUntil(exam.date),
+      stats:
+        stats[exam.id] ??
+        ({
+          examId: exam.id,
+          targetMinutes: exam.targetHours ? Math.round(exam.targetHours * 60) : null,
+          plannedMinutes: 0,
+          remainingMinutes: null,
+          progressPct: null,
+          daysLeft: daysUntil(exam.date),
+          riskLevel: 'ok',
+        } as ExamStudyStats),
+    }));
+
+  return {
+    from,
+    to,
+    days: overviewDays,
+    exams,
+    warnings: buildRouteWarnings(),
+    totals: {
+      shiftMinutes: overviewDays.reduce((sum, day) => sum + day.shiftMinutes, 0),
+      studyMinutes: overviewDays.reduce((sum, day) => sum + day.studyMinutes, 0),
+      examCount: exams.length,
+      freeMinutes: overviewDays.reduce((sum, day) => sum + day.freeMinutes, 0),
+    },
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+/* ------------------------------------------------------- Google Calendar */
+
+/** Registra l'id dell'evento remoto per evitare duplicati nelle sincronizzazioni. */
+export function attachGoogleEvent(kind: 'shift' | 'exam', id: string, googleEventId: string | null): void {
+  if (kind === 'shift') {
+    const shift = loadStore().shifts.find((item) => item.id === baseIdOf(id));
+    if (!shift || shift.googleEventId === googleEventId) return;
+    shift.googleEventId = googleEventId;
+    markUpdated();
+    return;
+  }
+
+  const exam = loadStore().exams.find((item) => item.id === id);
+  if (!exam || exam.googleEventId === googleEventId) return;
+  exam.googleEventId = googleEventId;
+  markUpdated();
+}
+
+/* ------------------------------------------------- Compatibilità con la HUD */
 export interface LegacyShift {
   id: string;
   day: string;

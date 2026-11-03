@@ -26,8 +26,11 @@ import {
   ExamPriority,
   ExamRecord,
   ExamStatus,
+  ExamStudyStats,
+  GoogleCalendarStatus,
   ParsedShift,
   RouteAgenda,
+  RouteOverview,
   RouteStoreMeta,
   ShiftCategory,
   ShiftOccurrence,
@@ -39,12 +42,17 @@ import {
   createRouteShift,
   deleteRouteExam,
   deleteRouteShift,
+  fetchGoogleStatus,
   fetchRouteAgenda,
   fetchRouteExams,
+  fetchRouteOverview,
   parseShiftText,
+  syncGoogleCalendar,
   updateRouteExam,
   updateRouteShift,
 } from '../services/api';
+import RouteHorizon from './route/RouteHorizon';
+import RouteCalendarCard from './route/RouteCalendarCard';
 import {
   EmptyState,
   PageHeader,
@@ -182,11 +190,13 @@ interface EditableShift {
   start: string;
   end: string;
   location?: string;
+  examId?: string;
   recurrence: ShiftRecurrence;
 }
 
 interface DraftShift extends ParsedShift {
   key: string;
+  examId?: string;
 }
 
 /* ------------------------------------------------------------------ Esami */
@@ -239,6 +249,7 @@ interface EditableExam {
   priority: ExamPriority;
   cfu: string;
   grade: string;
+  targetHours: string;
   topics: string;
   notes: string;
 }
@@ -256,6 +267,7 @@ const blankExam = (date: string = todayISO()): EditableExam => ({
   priority: 'media',
   cfu: '',
   grade: '',
+  targetHours: '',
   topics: '',
   notes: '',
 });
@@ -268,6 +280,7 @@ const editableFromExam = (exam: ExamRecord): EditableExam => ({
   priority: exam.priority,
   cfu: exam.cfu != null ? String(exam.cfu) : '',
   grade: exam.grade != null ? String(exam.grade) : '',
+  targetHours: exam.targetHours != null ? String(exam.targetHours) : '',
   topics: exam.topics ?? '',
   notes: exam.notes ?? '',
 });
@@ -282,6 +295,7 @@ const editableFromParsed = (
   priority: exam.priority,
   cfu: exam.cfu != null ? String(exam.cfu) : '',
   grade: exam.grade != null ? String(exam.grade) : '',
+  targetHours: '',
   topics: exam.topics ?? '',
   notes: exam.notes ?? '',
 });
@@ -294,6 +308,7 @@ const examPayloadFrom = (draft: EditableExam): ExamPayload => ({
   priority: draft.priority,
   cfu: draft.cfu.trim() === '' ? null : Number(draft.cfu),
   grade: draft.grade.trim() === '' ? null : Number(draft.grade),
+  targetHours: draft.targetHours.trim() === '' ? null : Number(draft.targetHours),
   topics: draft.topics.trim() || undefined,
   notes: draft.notes.trim() || undefined,
 });
@@ -352,7 +367,8 @@ const ShiftFields: React.FC<{
   onChange: (next: EditableShift) => void;
   showRecurrence?: boolean;
   disabled?: boolean;
-}> = ({ value, onChange, showRecurrence = false, disabled = false }) => (
+  exams?: ExamRecord[];
+}> = ({ value, onChange, showRecurrence = false, disabled = false, exams = [] }) => (
   <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
     <input
       className={`col-span-2 sm:col-span-2 ${inputClass}`}
@@ -410,6 +426,22 @@ const ShiftFields: React.FC<{
       >
         <option value="none">Una tantum</option>
         <option value="weekly">Ogni settimana</option>
+      </select>
+    ) : null}
+    {exams.length > 0 ? (
+      <select
+        className={`col-span-2 sm:col-span-2 ${inputClass}`}
+        value={value.examId ?? ''}
+        onChange={(event) => onChange({ ...value, examId: event.target.value })}
+        disabled={disabled}
+        title="Collega l'impegno alla preparazione di un esame"
+      >
+        <option value="">Studio libero (nessun esame collegato)</option>
+        {exams.map((exam) => (
+          <option key={exam.id} value={exam.id}>
+            per {exam.subject}
+          </option>
+        ))}
       </select>
     ) : null}
   </div>
@@ -496,6 +528,17 @@ const ExamFields: React.FC<{
         disabled={disabled}
         title="Voto (18–30, 31 = 30L)"
       />
+      <input
+        type="number"
+        min={1}
+        max={500}
+        className={`col-span-2 sm:col-span-2 ${inputClass}`}
+        value={value.targetHours}
+        onChange={(event) => onChange({ ...value, targetHours: event.target.value })}
+        placeholder="Ore di studio previste"
+        disabled={disabled}
+        title="Quante ore vuoi dedicare alla preparazione (usato per l'avanzamento)"
+      />
     </div>
 
     <input
@@ -519,7 +562,8 @@ const DraftCard: React.FC<{
   draft: DraftShift;
   onChange: (patch: Partial<DraftShift>) => void;
   onRemove: () => void;
-}> = ({ draft, onChange, onRemove }) => (
+  exams?: ExamRecord[];
+}> = ({ draft, onChange, onRemove, exams = [] }) => (
   <div className="surface-2 p-3">
     <div className="mb-2 flex items-center justify-between gap-2">
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -548,6 +592,7 @@ const DraftCard: React.FC<{
       value={draft}
       onChange={(next) => onChange(next)}
       showRecurrence
+      exams={exams}
     />
 
     {draft.warnings.length > 0 || (draft.conflicts?.length ?? 0) > 0 ? (
@@ -558,7 +603,7 @@ const DraftCard: React.FC<{
             className="flex items-start gap-1.5 font-mono text-[10px] leading-snug text-amber-300/90"
           >
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-            Sovrapposizione con {conflict.title} ({conflict.start}–{conflict.end})
+            {conflict.kind === 'exam' ? 'Appello' : 'Sovrapposizione con'} {conflict.title} ({conflict.start}–{conflict.end})
           </p>
         ))}
         {draft.warnings.map((warning) => (
@@ -596,6 +641,7 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
     start: '09:00',
     end: '13:00',
     location: '',
+    examId: '',
     recurrence: 'none',
   }));
 
@@ -614,6 +660,12 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
   const [examDeletingId, setExamDeletingId] = useState<string | null>(null);
   const [examDrafts, setExamDrafts] = useState<DraftExam[]>([]);
   const [examDraftErrors, setExamDraftErrors] = useState<string[]>([]);
+
+  /* ------------------------------------------------------- Orizzonte e calendario */
+  const [overview, setOverview] = useState<RouteOverview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [googleStatus, setGoogleStatus] = useState<GoogleCalendarStatus | null>(null);
+  const [syncingCalendar, setSyncingCalendar] = useState(false);
 
   const notify = useCallback((tone: 'ok' | 'warn', text: string) => {
     setNotice({ tone, text });
@@ -657,6 +709,50 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
     void loadExams();
   }, [loadExams]);
 
+  const loadOverview = useCallback(async () => {
+    setOverviewLoading(true);
+    try {
+      setOverview(await fetchRouteOverview(60));
+    } catch {
+      // l'orizzonte è complementare: un errore non blocca l'agenda
+    } finally {
+      setOverviewLoading(false);
+    }
+  }, []);
+
+  const loadCalendar = useCallback(async () => {
+    try {
+      setGoogleStatus(await fetchGoogleStatus());
+    } catch {
+      // calendario non configurato o non raggiungibile
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadOverview();
+    void loadCalendar();
+  }, [loadOverview, loadCalendar]);
+
+  const handleCalendarSync = async () => {
+    if (syncingCalendar) return;
+    setSyncingCalendar(true);
+    try {
+      const result = await syncGoogleCalendar();
+      setGoogleStatus(result);
+      notify(
+        'ok',
+        `Calendario aggiornato: ${result.shiftSynced ?? 0} impegni, ${result.examSynced ?? 0} esami.`,
+      );
+      await loadExams();
+      await loadOverview();
+    } catch (err: any) {
+      notify('warn', err?.message || 'Sincronizzazione con Google Calendar non riuscita.');
+      await loadCalendar();
+    } finally {
+      setSyncingCalendar(false);
+    }
+  };
+
   const selectedDay = useMemo<AgendaDay | null>(() => {
     if (!agenda || agenda.days.length === 0) return null;
     return (
@@ -685,6 +781,7 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
 
     const data = await loadAgenda(from);
     if (data) notify('ok', message);
+    void loadOverview();
     onChanged?.();
   };
 
@@ -769,6 +866,7 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
           start: draft.start,
           end: draft.end,
           location: draft.location?.trim() || undefined,
+          examId: draft.examId || null,
           recurrence: draft.recurrence,
         };
         const response = await createRouteShift(payload);
@@ -811,6 +909,7 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
         start: manual.start,
         end: manual.end,
         location: manual.location?.trim() || undefined,
+        examId: manual.examId || null,
         recurrence: manual.recurrence,
       });
 
@@ -842,6 +941,7 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
       start: shift.start,
       end: shift.end,
       location: shift.location ?? '',
+      examId: shift.examId ?? '',
       recurrence: shift.recurrence,
     });
   };
@@ -863,6 +963,7 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
         start: editDraft.start,
         end: editDraft.end,
         location: editDraft.location?.trim() || undefined,
+        examId: editDraft.examId || null,
       });
       const focusDate = editDraft.date;
       cancelEdit();
@@ -1046,6 +1147,18 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
     .filter((exam) => exam.status !== 'ritirato')
     .reduce((sum, exam) => sum + (exam.cfu ?? 0), 0);
 
+  const examStatsById = useMemo(() => {
+    const map = new Map<string, ExamStudyStats>();
+    overview?.exams.forEach((exam) => map.set(exam.id, exam.stats));
+    return map;
+  }, [overview]);
+
+  const examById = useMemo(() => {
+    const map = new Map<string, ExamRecord>();
+    examRows.forEach((exam) => map.set(exam.id, exam));
+    return map;
+  }, [examRows]);
+
   /* -------------------------------------------------------------------- Render */
 
   return (
@@ -1205,6 +1318,7 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
               <DraftCard
                 key={draft.key}
                 draft={draft}
+                exams={examRows}
                 onChange={(patch) => updateDraft(index, patch)}
                 onRemove={() => setDrafts((previous) => previous.filter((_, i) => i !== index))}
               />
@@ -1296,6 +1410,7 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
               value={manual}
               onChange={setManual}
               showRecurrence
+              exams={examRows}
               disabled={saving}
             />
             <div className="flex flex-wrap items-center gap-2">
@@ -1328,6 +1443,14 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
           </div>
         ) : null}
       </Panel>
+
+      {/* ------------------------------------------------ Orizzonte 60 giorni */}
+      <RouteHorizon
+        overview={overview}
+        loading={overviewLoading}
+        onFocusDate={(date) => goToWeek(startOfWeekISO(date))}
+        onRefresh={() => void loadOverview()}
+      />
 
       {/* --------------------------------------------------------- Agenda + analytics */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
@@ -1490,7 +1613,7 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                        <ShiftFields value={editDraft} onChange={setEditDraft} disabled={saving} />
+                        <ShiftFields value={editDraft} onChange={setEditDraft} exams={examRows} disabled={saving} />
                         {shift.isRecurring ? (
                           <p className="mt-2 font-mono text-[10px] leading-snug text-amber-300/80">
                             Impegno ricorrente: le modifiche valgono per tutta la serie settimanale.
@@ -1534,6 +1657,18 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
                                 <span className="inline-flex items-center gap-1 normal-case tracking-normal">
                                   <MapPin className="h-2.5 w-2.5" />
                                   {shift.location}
+                                </span>
+                              ) : null}
+                              {shift.examId && examById.get(shift.examId) ? (
+                                <span className="inline-flex items-center gap-1 normal-case tracking-normal text-accent-soft">
+                                  <GraduationCap className="h-2.5 w-2.5" />
+                                  per {examById.get(shift.examId)!.subject}
+                                </span>
+                              ) : null}
+                              {shift.googleEventId ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <CalendarDays className="h-2.5 w-2.5" />
+                                  su Calendar
                                 </span>
                               ) : null}
                               {shift.source === 'nico' ? <span>· da N.I.C.O.</span> : null}
@@ -1753,6 +1888,7 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
                   const daysLeft = daysLeftOf(exam.date);
                   const passed = exam.status === 'superato';
                   const missed = !passed && exam.status !== 'ritirato' && daysLeft < 0;
+                  const stat = examStatsById.get(exam.id);
 
                   if (isEditing) {
                     return (
@@ -1874,6 +2010,29 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
                             </p>
                           ) : null}
 
+                          {stat && stat.targetMinutes ? (
+                            <div className="mt-2">
+                              <div className="flex items-baseline justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.06em] text-ink-dim">
+                                <span>Studio pianificato</span>
+                                <span className="text-ink">
+                                  {formatDuration(stat.plannedMinutes)} / {formatDuration(stat.targetMinutes)}
+                                  {stat.progressPct !== null ? ` · ${stat.progressPct}%` : ''}
+                                </span>
+                              </div>
+                              <Progress
+                                value={stat.progressPct ?? 0}
+                                tone={
+                                  stat.progressPct !== null && stat.progressPct >= 100
+                                    ? 'success'
+                                    : stat.riskLevel === 'critical'
+                                      ? 'danger'
+                                      : 'warning'
+                                }
+                                className="mt-1.5"
+                              />
+                            </div>
+                          ) : null}
+
                           {exam.topics ? (
                             <p className="mt-2 text-[11px] leading-snug text-ink-soft line-clamp-2">
                               {exam.topics}
@@ -1887,6 +2046,12 @@ export const RouteModule: React.FC<RouteModuleProps> = ({ onChanged }) => {
               </ul>
             )}
           </Panel>
+
+          <RouteCalendarCard
+            status={googleStatus}
+            syncing={syncingCalendar}
+            onSync={() => void handleCalendarSync()}
+          />
         </div>
       </div>
 

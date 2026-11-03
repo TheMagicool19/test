@@ -100,9 +100,105 @@ curl -X POST localhost:3000/api/route/shifts \
 
 curl -X POST localhost:3000/api/route/exams \
   -H 'Content-Type: application/json' \
-  -d '{"subject":"Chimica Organica II","date":"2026-12-05","time":"09:00","status":"prenotato","priority":"alta","cfu":8}'
+  -d '{"subject":"Chimica Organica II","date":"2026-12-05","time":"09:00","status":"prenotato","priority":"alta","cfu":8,"targetHours":30}'
 
 curl "localhost:3000/api/route/agenda?from=2026-11-02&to=2026-11-08&buffer=30"
+```
+
+## C-05c · Preparazione, orizzonte e segnalazioni
+
+**Studio collegato all'esame.** Un impegno può portare `examId`: è una sessione di
+studio dedicata a una materia. Il motore somma i minuti pianificati da oggi fino
+all'appello e li confronta con `targetHours` dell'esame.
+
+| Endpoint | Descrizione |
+| --- | --- |
+| `GET` | `/api/route/overview?days=60` | Giorni, esami con avanzamento, segnalazioni |
+| `GET` | `/api/route/warnings` | Solo le segnalazioni (con conteggio per severità) |
+
+**Segnalazioni deterministiche** (`buildRouteWarnings`): appello entro 7 giorni,
+appello entro 21 giorni senza ore di studio pianificate, copertura del target
+sotto il 50%, appello passato con stato non aggiornato, settimana con più di 40
+ore impegnate.
+
+**Conflitti.** `findConflicts` ora considera anche gli appelli: pianificare studio
+sopra un esame produce un conflitto con `kind: "exam"`.
+
+**Vista «Orizzonte».** La UI mostra le prossime settimane (carico impegni +
+studio), gli appelli con la barra di avanzamento e le segnalazioni.
+
+## Google Calendar · sync e notifiche sul telefono
+
+Ogni impegno salvato in R.O.U.T.E. viene creato (o aggiornato/eliminato) anche su
+Google Calendar; gli esami compaiono come appelli (tutto il giorno se l'ora non è
+nota). I reminder sono impostati sull'evento stesso:
+
+| Evento | Reminder |
+| --- | --- |
+| Impegno | 60′ e 10′ prima |
+| Esame | 1 giorno e 2 ore prima |
+
+### Configurazione (una volta sola)
+
+1. **Google Cloud Console** → crea un progetto e abilita **Google Calendar API**.
+2. **OAuth consent screen**: tipo *External*, aggiungi il tuo account come
+   *test user*.
+3. **Credenziali → Crea credenziali → ID client OAuth**, tipo **App desktop**.
+   Copia Client ID e Client Secret.
+4. Nel codespace esegui:
+
+```bash
+npm run google:auth
+```
+
+Lo script avvia un server locale sulla porta `53682`, stampa l'URL di consenso e,
+al ritorno, il **refresh token**. In Codespaces inoltra la porta `53682` dal
+pannello *Porte* se la pagina di ritorno non si apre.
+
+5. Crea il file `.env` (parti da `.env.example`) e incolla i valori:
+
+```env
+GOOGLE_CLIENT_ID="…apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="…"
+GOOGLE_REFRESH_TOKEN="…"
+GOOGLE_CALENDAR_ID="primary"   # oppure un calendario dedicato
+GOOGLE_TIMEZONE="Europe/Rome"
+```
+
+6. Riavvia il server e premi **«Sincronizza ora»** nel pannello Google Calendar
+   di R.O.U.T.E. (oppure `POST /api/google/sync`).
+
+### Endpoint
+
+| Metodo | Endpoint | Descrizione |
+| --- | --- | --- |
+| `GET` | `/api/google/status` | Configurazione, ultima sync, ultimo errore, eventi da sincronizzare |
+| `POST` | `/api/google/ping` | Verifica che il refresh token funzioni |
+| `POST` | `/api/google/sync` | Sincronizza impegni futuri/ricorrenti e tutti gli esami |
+
+**Dry run.** Con `GOOGLE_CALENDAR_DRY_RUN=1` gli eventi vengono solo stampati nel
+log: utile per verificare la configurazione senza toccare il calendario.
+
+**Notifiche sul telefono.** Arrivano dall'app Google Calendar: verifica che le
+notifiche dell'app siano attive e che il calendario scelto sia visibile
+(`GOOGLE_CALENDAR_ID`). Se usi un calendario secondario, attivalo sul telefono.
+
+**Senza credenziali** R.O.U.T.E. funziona normalmente: la sincronizzazione resta
+inerte e l'app mostra «non configurato».
+
+## Robustezza dello store
+
+- Scrittura **atomica**: `data/route.json` viene scritto su un file temporaneo e
+  sostituito con `rename`, così non si leggono mai JSON a metà.
+- **Backup**: prima di ogni scrittura, se sono passati almeno 10 minuti, lo store
+  corrente viene copiato in `data/backups/route-<timestamp>.json` (ultimi 20 file).
+- Se un processo scrive mentre un altro è attivo, il backup permette di
+  recuperare lo stato precedente.
+
+Per ripristinare:
+
+```bash
+cp data/backups/route-<timestamp>.json data/route.json   # server fermo
 ```
 
 ## Integrazione N.I.C.O.
